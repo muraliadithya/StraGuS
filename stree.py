@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from ast import Assign
 from cProfile import label
+from re import A
 from typing import Tuple, Mapping, List, Union, Callable, Dict, Set, Iterable, Any
 from bidict import bidict, BidirectionalMapping
 import random
@@ -11,6 +12,8 @@ import itertools
 # Vars = Set[str]
 Sig = Dict[str,int]
 Prefix = List[bool]
+def flip(pre: Prefix) -> Prefix:
+    return map(lambda b: not b, pre)
 # [x1 -> i1, ..., xn -> in] represented as [i1,...,in]
 Assignment = List[int]
 # a type for bijections (want to go between stree and its corresponding model) 
@@ -147,9 +150,7 @@ class Atomic(QuantifierFreeFormula):
 def substitute(gamma: Assignment, args: List[int]):
     return [gamma[arg] for arg in args]
 
-sig0 = {"P": 1}
 sig1 = {"E": 2, "R": 1, "P": 3}
-# vars = set(["x1","x2","x3","x4"])
 
 c1 = Conjunction()
 l = Atomic()
@@ -185,21 +186,66 @@ def randomModel(size: int, sg: Sig) -> Model:
 def generateAllTuples(arity: int, d: Iterable):
     return itertools.product(d, repeat=arity)
 
-class STree:
-    pass
+# an STree consists of a model and its strategy tree 
+Tree = List[Tuple[int, Any]]
 
-class ENode(STree): 
-    stree: List[tuple(int, List[STree])]
-    model: Model
-    nvars: int
+def str_of_tree(tree: Tree, pre: Prefix) -> str:
+    
+    def help(tree: Tree, pre: Prefix, depth: int) -> str:
+        if not pre: 
+            return ""            
+        s = " " * depth
+        if pre[0]: 
+            s += "∀\n" 
+        else: 
+            s += "∃\n" 
+        for (i,child) in tree:
+            s += " "*depth + f"|{i}\n" + help(child, pre[1:], depth+1)
+        return s
+    
+    return help(tree, pre, 0)
+# Prints a tree like this:
+#      [a]
+#     /  \
+#   [b] [c]
+#   /    \
+# [x]   [d,e]
+# 
+# As this:
+# 
+# a
+# |b
+#  |x
+# |c
+#  |d
+#  |e
 
-    def __init__(self, model: Model, nvars: int):
-        df = model.least() # teacher starts with least element of domain
-        self.stree = list(itertools.repeat([df], nvars))
-        self.nvars = nvars 
+class STree: 
+    model: LabeledModel
+    prefix: Prefix
+    tree: Tree
+
+    def __str__(self) -> str:
+        return str_of_tree(self.tree, self.prefix)
+
+    def __init__(self, model: LabeledModel, prefix: Prefix):
         self.model = model
+        def construct_tree(dom: Iterable[int], default: int, pre: Prefix) -> Tree:
+            if not pre:
+                return []
+            if pre[0]: # universal
+                return [(default, construct_tree(dom, default, pre[1:]))]
+            else: # existential
+                ts = []
+                for a in dom:
+                    ts.append((a, construct_tree(dom, default, pre[1:])))
+                return ts
+        # teacher starts with least element of domain
+        self.tree = construct_tree(self.model.domain, self.model.least(), prefix)
+        self.prefix = prefix
 
-    # recursively generate assignments encoded in an stree for a given quantifier prefix
+    # recursively generate assignments encoded in an stree for a given
+    # quantifier prefix. Do we want this?
     def plays(self, pre: Prefix) -> List[Assignment]:
 
         def playsAux(p: Prefix, i: int) -> List[Assignment]:
@@ -212,9 +258,6 @@ class ENode(STree):
                 return [a.insert(0,-1) for a in ass]
         
         return playsAux(pre, 0)
-
-    def __str__(self) -> str:
-        return f"{{ {str(self.stree)} }}"
 
 # returns random models with distinct ids
 def getModels(sz: int, nm: int, sg: Sig) -> Iterable[Model]:
@@ -249,7 +292,36 @@ def respond(phi: QuantifierFreeFormula,
                 pass
 
 def main():
-    print("hi")
+    print("main running...")
+
+def stragus(ms: Iterable[Model], prefix: Prefix) -> QuantifierFreeFormula:
+
+    def loop(ms: Iterable[Model], prefix: Prefix, strategies: BidirectionalMapping[Model, STree]):
+        phi = synth(ms, strategies)
+        cex = verify(ms, phi)
+        if not cex:
+            return QuantifiedFormula(prefix, phi)
+        else:
+            strategies = update(ms, strategies, phi, cex)
+            return loop(ms, prefix, strategies)
+
+    return loop(ms, prefix, initialize_strategies(ms))
+
+def initialize_strategies(ms: Iterable[LabeledModel], pre: Prefix) -> Iterable[STree]:
+    return map(lambda m: STree(m, pre) if m.positive else STree(m, flip(pre)), ms)
+
+def synth():
+    pass 
+def verify():
+    pass 
+def update(ms: Iterable[Model], strategy):
+    pass
+
+# Precondition: 
+# ¬(stree.model ⊧ stree.prefix.  phi) if stree.model.positive
+# ¬(stree.model ⊧ stree.prefix. ¬phi) if stree.model.negative
+def update_strategy(phi: QuantifierFreeFormula, stree: STree) -> STree:
+    pass
 
 if __name__ == "__main__":
     main()
