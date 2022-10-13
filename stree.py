@@ -1,4 +1,7 @@
+from __future__ import annotations
 from abc import abstractmethod
+from ast import Assign
+from cProfile import label
 from typing import Tuple, Mapping, List, Union, Callable, Dict, Set, Iterable, Any
 from bidict import bidict, BidirectionalMapping
 import random
@@ -12,7 +15,6 @@ Prefix = List[bool]
 Assignment = List[int]
 # a type for bijections (want to go between stree and its corresponding model) 
 STrees = BidirectionalMapping
-
 
 class Model:
     # id distinguishes models
@@ -28,6 +30,10 @@ class Model:
         self.rels = rs
         self.sig = sg
         self.id=id
+
+    # return the list of all assignments for nvars variables
+    def assignments(self, nvars: int) -> List[Assignment]:
+        return generateAllTuples(nvars, self.domain)
 
     def __str__(self) -> str:
         return f"{{ {str(self.id)} }}" \
@@ -53,6 +59,13 @@ class Model:
             and all(d >= 0 for d in self.domain) \
             and all(wellformedInterp(name,interp,self.sig,self.domain) for name,interp in self.rels.items()) 
 
+class LabeledModel(Model):
+    positive: bool
+    def __init__(self, dm, rs, sg, b, id=0):
+        super().__init__(dm, rs, sg, id)
+        self.positive=b
+
+
 # just a base class for the thing learner sends
 class QuantifierFreeFormula:
     sig: Sig
@@ -60,32 +73,71 @@ class QuantifierFreeFormula:
     @abstractmethod
     def interpret(self, m: Model, a: Assignment) -> bool: ...
 
+class QuantifiedFormula:
+    prefix: Prefix 
+    matrix: QuantifierFreeFormula
+
+    def __init__(self, p: Prefix, qf: QuantifierFreeFormula): 
+        self.prefix=p 
+        self.matrix=qf
+
+    def __str__(self) -> str:
+        def str_of_prefix(pre: Prefix):
+            return "".join(map(lambda x: "∀" if x else "∃", pre))
+        return f"{str_of_prefix(self.prefix)}. {self.matrix}"
+
+    def interpret(self, m: Model) -> bool: 
+        
+        def interpret_aux(m: Model, pre: Prefix, partial_assignment: Assignment):
+            if not pre:
+                return self.matrix.interpret(m, partial_assignment)
+            else:
+                if pre[0]: # universal
+                    return all(interpret_aux(m, pre[1:], partial_assignment + [a]) for a in m.domain)
+                else: # existential 
+                    return any(interpret_aux(m, pre[1:], partial_assignment + [a]) for a in m.domain)
+        
+        return interpret_aux(m, self.prefix, [])
+
 class Conjunction(QuantifierFreeFormula):
     left: QuantifierFreeFormula
     right: QuantifierFreeFormula
 
+    def __str__(self) -> str:
+        return f"({self.left} ∧ {self.right})"
+
     def interpret(self, m: Model, a: Assignment):
-        self.left.interpret(m, a) and \
-        self.right.interpret(m, a)
+        return self.left.interpret(m, a) and \
+               self.right.interpret(m, a)
 
 class Disjunction(QuantifierFreeFormula):
     left: QuantifierFreeFormula
     right: QuantifierFreeFormula
 
+    def __str__(self) -> str:
+        return f"({self.left} ∨ {self.right})"
+
     def interpret(self, m: Model, a: Assignment):
-        self.left.interpret(m, a) or \
-        self.right.interpret(m, a)
+        return self.left.interpret(m, a) or \
+               self.right.interpret(m, a)
 
 class Negation(QuantifierFreeFormula):
     left: QuantifierFreeFormula
 
+    def __str__(self) -> str:
+        return f"¬{self.left}"
+
     def interpret(self, m: Model, a: Assignment):
-        not self.left.interpret(m, a) 
+        return not self.left.interpret(m, a) 
         
 class Atomic(QuantifierFreeFormula):
     name: str 
     args: List[int] # variables represented as integers
 
+    def __str__(self) -> str:
+        argument_string = ", ".join(("x"+str(arg) for arg in self.args))
+        return f"{self.name}({argument_string})"
+    
     def interpret(self, m: Model, a: Assignment):
         assert(self.sig == m.sig)
         assert(self.name in self.sig)
@@ -94,6 +146,26 @@ class Atomic(QuantifierFreeFormula):
         
 def substitute(gamma: Assignment, args: List[int]):
     return [gamma[arg] for arg in args]
+
+sig0 = {"P": 1}
+sig1 = {"E": 2, "R": 1, "P": 3}
+# vars = set(["x1","x2","x3","x4"])
+
+c1 = Conjunction()
+l = Atomic()
+l.name = "E"
+l.args = [0,1]
+l.sig = sig1 
+r = Atomic()
+r.name = "P"
+r.args = [1,2,1]
+r.sig = sig1
+c1.left = l 
+c1.right = r 
+c1.sig = sig1
+pre = [True,False,False]
+qf = c1
+f = QuantifiedFormula(pre,qf)
 
 
 def randomModel(size: int, sg: Sig) -> Model:
@@ -113,17 +185,19 @@ def randomModel(size: int, sg: Sig) -> Model:
 def generateAllTuples(arity: int, d: Iterable):
     return itertools.product(d, repeat=arity)
 
-sig0 = {"P": 1}
-sig1 = {"E": 2, "R": 1, "P": 3}
-# vars = set(["x1","x2","x3","x4"])
-
-# assuming we don't pass existential witnesses around
 class STree:
-    stree: List[List[int]] # should have length nvars
+    pass
+
+class ENode(STree): 
+    stree: List[tuple(int, List[STree])]
+    model: Model
+    nvars: int
 
     def __init__(self, model: Model, nvars: int):
         df = model.least() # teacher starts with least element of domain
         self.stree = list(itertools.repeat([df], nvars))
+        self.nvars = nvars 
+        self.model = model
 
     # recursively generate assignments encoded in an stree for a given quantifier prefix
     def plays(self, pre: Prefix) -> List[Assignment]:
@@ -151,14 +225,28 @@ def getModels(sz: int, nm: int, sg: Sig) -> Iterable[Model]:
         ms.append(m)
     return ms
 
-def initSTrees(models, vars):
+def initSTrees(models: Iterable[Model], nvars: int):
     strees = bidict() 
     for model in models:
-        strees[model] = STree(model, vars)
+        strees[model] = STree(model, nvars)
     return strees
 
-def respond(phi: Formula, pre: Prefix, st: BidirectionalMapping) -> BidirectionalMapping:
-    return st
+# ignoring models for now and just paying attention to those represented in st
+def respond(phi: QuantifierFreeFormula,
+            pre: Prefix,
+            st: BidirectionalMapping,
+            models: Iterable[LabeledModel]) -> BidirectionalMapping:
+    # randomly select a model on which pre.phi fails
+    ms = []
+    for labeled_model, strategy_tree in st:
+        assignments = labeled_model.assignments(len(pre))
+        if labeled_model.positive:
+            extension = list(filter(lambda a: phi.interpret(labeled_model, a), assignments))
+        else:
+            extension = list(filter(lambda a: phi.interpret(labeled_model, a), assignments))
+        if not extension:
+            if not labeled_model.positive:
+                pass
 
 def main():
     print("hi")
