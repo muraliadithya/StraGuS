@@ -13,7 +13,7 @@ import itertools
 Sig = Dict[str,int]
 Prefix = List[bool]
 def flip(pre: Prefix) -> Prefix:
-    return map(lambda b: not b, pre)
+    return list(map(lambda b: not b, pre))
 # [x1 -> i1, ..., xn -> in] represented as [i1,...,in]
 Assignment = List[int]
 # a type for bijections (want to go between stree and its corresponding model) 
@@ -39,10 +39,10 @@ class Model:
         return generateAllTuples(nvars, self.domain)
 
     def __str__(self) -> str:
-        return f"{{ {str(self.id)} }}" \
-             + f"{{ {', '.join(map(str, self.domain))} }}" \
-             + f"{{ {str(self.rels)} }}" \
-             + f"{{ {str(self.sig)} }}"
+        return f"{{id: {str(self.id)} }}" \
+             + f"{{domain: {', '.join(map(str, self.domain))} }}" \
+             + f"{{relations: {str(self.rels)} }}" \
+             + f"{{signature: {str(self.sig)} }}"
     
     # useful to pick a default play for the teacher
     def least(self) -> int:
@@ -68,14 +68,6 @@ class LabeledModel(Model):
         super().__init__(dm, rs, sg, id)
         self.positive=b
 
-
-# just a base class for the thing learner sends
-class QuantifierFreeFormula:
-    sig: Sig
-
-    @abstractmethod
-    def interpret(self, m: Model, a: Assignment) -> bool: ...
-
 class QuantifiedFormula:
     prefix: Prefix 
     matrix: QuantifierFreeFormula
@@ -89,22 +81,40 @@ class QuantifiedFormula:
             return "".join(map(lambda x: "∀" if x else "∃", pre))
         return f"{str_of_prefix(self.prefix)}. {self.matrix}"
 
-    def interpret(self, m: Model) -> bool: 
+    def interpret_formula(self, m: Model, pre: Prefix, partial_assignment: Assignment):
+        if not pre:
+            return self.matrix.interpret(m, partial_assignment)
+        else:
+            if pre[0]: # universal
+                return all(self.interpret_formula(m, pre[1:], partial_assignment + [a]) for a in m.domain)
+            else: # existential 
+                return any(self.interpret_formula(m, pre[1:], partial_assignment + [a]) for a in m.domain)
         
-        def interpret_aux(m: Model, pre: Prefix, partial_assignment: Assignment):
-            if not pre:
-                return self.matrix.interpret(m, partial_assignment)
-            else:
-                if pre[0]: # universal
-                    return all(interpret_aux(m, pre[1:], partial_assignment + [a]) for a in m.domain)
-                else: # existential 
-                    return any(interpret_aux(m, pre[1:], partial_assignment + [a]) for a in m.domain)
-        
-        return interpret_aux(m, self.prefix, [])
+    def interpret_sentence(self, m: Model) -> bool: 
+        return self.interpret_formula(m, self.prefix, [])
+
+    # pretends the first quantifier of pre is absent, and returns list of domain
+    # elements a that make self.matrix true with prefix pre[1:] and assignment
+    # partial_assignment+[a]. The intention is that this function is called when
+    # pre starts with an existential.
+    def extension(self, m: Model, pre: Prefix, partial_assignment: Assignment) -> List[int]:
+        return list(filter(lambda a: self.interpret_formula(m, pre[1:], partial_assignment + [a]), m.domain))
+
+# just a base class for the thing learner sends
+class QuantifierFreeFormula:
+    sig: Sig
+
+    @abstractmethod
+    def interpret(self, m: Model, a: Assignment) -> bool: ...
 
 class Conjunction(QuantifierFreeFormula):
     left: QuantifierFreeFormula
     right: QuantifierFreeFormula
+
+    def __init__(self, left: QuantifierFreeFormula, right: QuantifierFreeFormula):
+        super().__init__()    
+        self.left = left
+        self.right = right
 
     def __str__(self) -> str:
         return f"({self.left} ∧ {self.right})"
@@ -117,6 +127,11 @@ class Disjunction(QuantifierFreeFormula):
     left: QuantifierFreeFormula
     right: QuantifierFreeFormula
 
+    def __init__(self, left: QuantifierFreeFormula, right: QuantifierFreeFormula):
+        super().__init__()    
+        self.left = left
+        self.right = right
+
     def __str__(self) -> str:
         return f"({self.left} ∨ {self.right})"
 
@@ -127,6 +142,10 @@ class Disjunction(QuantifierFreeFormula):
 class Negation(QuantifierFreeFormula):
     left: QuantifierFreeFormula
 
+    def __init__(self, left: QuantifierFreeFormula):
+        super().__init__()    
+        self.left = left
+
     def __str__(self) -> str:
         return f"¬{self.left}"
 
@@ -136,6 +155,11 @@ class Negation(QuantifierFreeFormula):
 class Atomic(QuantifierFreeFormula):
     name: str 
     args: List[int] # variables represented as integers
+
+    def __init__(self, name: str, args: List[int]):
+        super().__init__()    
+        self.name = name 
+        self.args = args
 
     def __str__(self) -> str:
         argument_string = ", ".join(("x"+str(arg) for arg in self.args))
@@ -150,23 +174,17 @@ class Atomic(QuantifierFreeFormula):
 def substitute(gamma: Assignment, args: List[int]):
     return [gamma[arg] for arg in args]
 
+sig0 = {"E": 2}
 sig1 = {"E": 2, "R": 1, "P": 3}
 
-c1 = Conjunction()
-l = Atomic()
-l.name = "E"
-l.args = [0,1]
-l.sig = sig1 
-r = Atomic()
-r.name = "P"
-r.args = [1,2,1]
-r.sig = sig1
-c1.left = l 
-c1.right = r 
-c1.sig = sig1
-pre = [True,False,False]
-qf = c1
-f = QuantifiedFormula(pre,qf)
+# examples of quantified formula
+l1 = Atomic("E", [0,1])
+l1.sig = sig0
+phi1 = QuantifiedFormula([True,False], l1)
+
+l2 = Atomic("E", [0,0])
+l2.sig = sig0
+phi2 = QuantifiedFormula([True], l2)
 
 
 def randomModel(size: int, sg: Sig) -> Model:
@@ -174,7 +192,7 @@ def randomModel(size: int, sg: Sig) -> Model:
     rs = {}
     # build "full" model
     for name,arity in sg.items():
-        rs[name] = list(generateAllTuples(arity, dom))
+        rs[name] = generateAllTuples(arity, dom)
     # randomly drop tuples from each relation
     rss = rs.copy()
     for name,interp in rs.items():
@@ -183,15 +201,15 @@ def randomModel(size: int, sg: Sig) -> Model:
                 rss[name].remove(tup)
     return Model(dom,rs,sg)
 
-def generateAllTuples(arity: int, d: Iterable):
-    return itertools.product(d, repeat=arity)
+def generateAllTuples(arity: int, d: Iterable) -> List[List[int]]:
+    return list(map(lambda x: list(x), itertools.product(d, repeat=arity)))
 
 # an STree consists of a model and its strategy tree 
 Tree = List[Tuple[int, Any]]
 
 def str_of_tree(tree: Tree, pre: Prefix) -> str:
     
-    def help(tree: Tree, pre: Prefix, depth: int) -> str:
+    def _str_of_tree(tree: Tree, pre: Prefix, depth: int) -> str:
         if not pre: 
             return ""            
         s = " " * depth
@@ -200,10 +218,10 @@ def str_of_tree(tree: Tree, pre: Prefix) -> str:
         else: 
             s += "∃\n" 
         for (i,child) in tree:
-            s += " "*depth + f"|{i}\n" + help(child, pre[1:], depth+1)
+            s += " "*depth + f"|{i}\n" + _str_of_tree(child, pre[1:], depth+1)
         return s
     
-    return help(tree, pre, 0)
+    return _str_of_tree(tree, pre, 0)
 # Prints a tree like this:
 #      [a]
 #     /  \
@@ -244,20 +262,18 @@ class STree:
         self.tree = construct_tree(self.model.domain, self.model.least(), prefix)
         self.prefix = prefix
 
-    # recursively generate assignments encoded in an stree for a given
-    # quantifier prefix. Do we want this?
-    def plays(self, pre: Prefix) -> List[Assignment]:
-
-        def playsAux(p: Prefix, i: int) -> List[Assignment]:
-            if not p:
-                return []
-            ass = playsAux(pre[1:],i+1)
-            if pre[0]: # all
-                return [a.insert(0, x) for x in self.stree[i] for a in ass]
-            else: # exists 
-                return [a.insert(0,-1) for a in ass]
+    # create a new subtree to beat current strategy
+    @staticmethod
+    def construct_new_play(pre: Prefix, matrix: QuantifierFreeFormula, m: Model, partial: Assignment) -> Tree:
+        if not pre:
+            return []
+        assert(not pre[0])
+        possible_plays = QuantifiedFormula(pre, matrix).extension(m, pre, partial)
+        assert(possible_plays)
+        play = possible_plays[0]
+        t = STree.construct_new_play(pre[1:], matrix, m, partial+[play])
+        return [(play, t)]
         
-        return playsAux(pre, 0)
 
 # returns random models with distinct ids
 def getModels(sz: int, nm: int, sg: Sig) -> Iterable[Model]:
@@ -268,31 +284,6 @@ def getModels(sz: int, nm: int, sg: Sig) -> Iterable[Model]:
         ms.append(m)
     return ms
 
-def initSTrees(models: Iterable[Model], nvars: int):
-    strees = bidict() 
-    for model in models:
-        strees[model] = STree(model, nvars)
-    return strees
-
-# ignoring models for now and just paying attention to those represented in st
-def respond(phi: QuantifierFreeFormula,
-            pre: Prefix,
-            st: BidirectionalMapping,
-            models: Iterable[LabeledModel]) -> BidirectionalMapping:
-    # randomly select a model on which pre.phi fails
-    ms = []
-    for labeled_model, strategy_tree in st:
-        assignments = labeled_model.assignments(len(pre))
-        if labeled_model.positive:
-            extension = list(filter(lambda a: phi.interpret(labeled_model, a), assignments))
-        else:
-            extension = list(filter(lambda a: phi.interpret(labeled_model, a), assignments))
-        if not extension:
-            if not labeled_model.positive:
-                pass
-
-def main():
-    print("main running...")
 
 def stragus(ms: Iterable[Model], prefix: Prefix) -> QuantifierFreeFormula:
 
@@ -320,8 +311,34 @@ def update(ms: Iterable[Model], strategy):
 # Precondition: 
 # ¬(stree.model ⊧ stree.prefix.  phi) if stree.model.positive
 # ¬(stree.model ⊧ stree.prefix. ¬phi) if stree.model.negative
-def update_strategy(phi: QuantifierFreeFormula, stree: STree) -> STree:
-    pass
+def update_strategy(phi: QuantifierFreeFormula, stree: STree) -> None:
+    matrix = phi if stree.model.positive else Negation(phi)
+    sent = QuantifiedFormula(stree.prefix, matrix)
+    # sanity check that we have a mistake on hand
+    assert(not sent.interpret_sentence(stree.model))
+    matrix_to_check = Negation(phi) if stree.model.positive else phi
+    prefix_to_check = flip(stree.prefix)
+    new_tree = walk_tree(stree, prefix_to_check, matrix_to_check)
+    stree.tree = new_tree 
+
+def walk_tree(st: STree, pre: Prefix, matrix: QuantifierFreeFormula) -> Tree:
+    m = st.model 
+    def rec(t: Tree, partial_assignment: Assignment, pre: Prefix) -> Tree:
+        if not pre: 
+            assert(matrix.interpret(m, partial_assignment))
+            return [(partial_assignment[-1], [])]
+        if pre[0]: # universal (existential for learner)
+            return list(map(lambda node: \
+              (node[0], rec(node[1], partial_assignment+[node[0]], pre[1:])), t))
+        else: # existential play by teacher 
+            # confusing! Maybe 'extension' should be a method of QuantifierFreeFormula
+            r = STree.construct_new_play(pre, matrix, m, partial_assignment)
+            return t+r
+    return rec(st.tree, [], pre)
+    
+def main():
+    print("main running...")
 
 if __name__ == "__main__":
     main()
+
