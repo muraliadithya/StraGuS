@@ -4,20 +4,20 @@ from ast import Assign
 from cProfile import label
 from re import A
 from typing import Tuple, Mapping, List, Union, Callable, Dict, Set, Iterable, Any
-from bidict import bidict, BidirectionalMapping
 import random
 import itertools 
 
-# Just make variables integers 
-# Vars = Set[str]
 Sig = Dict[str,int]
+
 Prefix = List[bool]
+
 def flip(pre: Prefix) -> Prefix:
     return list(map(lambda b: not b, pre))
+
+# Variables are represented by integers
 # [x1 -> i1, ..., xn -> in] represented as [i1,...,in]
 Assignment = List[int]
-# a type for bijections (want to go between stree and its corresponding model) 
-STrees = BidirectionalMapping
+
 
 class Model:
     # id distinguishes models
@@ -285,28 +285,40 @@ def getModels(sz: int, nm: int, sg: Sig) -> Iterable[Model]:
     return ms
 
 
-def stragus(ms: Iterable[Model], prefix: Prefix) -> QuantifierFreeFormula:
+def stragus(ms: Iterable[LabeledModel], prefix: Prefix) -> QuantifiedFormula:
 
-    def loop(ms: Iterable[Model], prefix: Prefix, strategies: BidirectionalMapping[Model, STree]):
-        phi = synth(ms, strategies)
-        cex = verify(ms, phi)
-        if not cex:
+    def loop(ms: Iterable[LabeledModel], prefix: Prefix, strees: Iterable[STree]):
+        phi = synth(ms, strees)
+        failures = verify(strees, phi)
+        if not failures:
             return QuantifiedFormula(prefix, phi)
         else:
-            strategies = update(ms, strategies, phi, cex)
-            return loop(ms, prefix, strategies)
+            update_strategies(failures, phi)
+            return loop(ms, prefix, strees)
 
-    return loop(ms, prefix, initialize_strategies(ms))
+    strees = initialize_strategies(ms, prefix)
+    return loop(ms, prefix, strees)
 
 def initialize_strategies(ms: Iterable[LabeledModel], pre: Prefix) -> Iterable[STree]:
     return map(lambda m: STree(m, pre) if m.positive else STree(m, flip(pre)), ms)
 
 def synth():
     pass 
-def verify():
-    pass 
-def update(ms: Iterable[Model], strategy):
-    pass
+
+def verify(strees: Iterable[STree], phi: QuantifierFreeFormula) -> List[STree]:
+    failures = []
+    for stree in strees:
+        if stree.model.positive:
+            if not QuantifiedFormula(stree.prefix, phi).interpret_sentence(stree.model):
+                failures += [stree]
+        else:
+            if not QuantifiedFormula(stree.prefix, Negation(phi)).interpret_sentence(stree.model):
+                failures += [stree]
+    return failures
+    
+def update_strategies(failures: Iterable[STree], phi: QuantifierFreeFormula) -> None:
+    for stree in failures:
+        update_strategy(phi, stree)
 
 # Precondition: 
 # ¬(stree.model ⊧ stree.prefix.  phi) if stree.model.positive
