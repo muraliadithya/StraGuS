@@ -1,0 +1,4 @@
+[submodule "mini-sygus"]
+	path = mini-sygus
+	url = https://github.com/eionblanc/mini-sygus
+	branch = stragus
