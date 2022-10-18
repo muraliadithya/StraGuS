@@ -157,7 +157,7 @@ def synthesize(signature: Sig, strategy_trees: Iterable[STree], options: dict = 
         options = {}
 
     call_name = options.get('name', None)
-    synth_file = f'synth{"" if call_name is None else "_" + call_name}.sy'
+    synth_file = 'synth.sy' if call_name is None else f'{call_name}.sy'
     synth_file = os.path.join(log_path, synth_file)
 
     models = [stree.model for stree in strategy_trees]
@@ -228,4 +228,3 @@ def test_synthesize_1():
     strees = [stree1, stree2]
     formula = synthesize(signature, strees, options={'mode': 'basic', 'name': 'test1'})
     print(formula)
-
