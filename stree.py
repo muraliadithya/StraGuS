@@ -74,8 +74,9 @@ class LabeledModel(Model):
         self.positive = is_pos
 
 
-# a simple labeled model for testing
-def simpleLabeledModelAndNearlyTrueFormula() -> Tuple[LabeledModel, QuantifiedFormula]:
+# simple models for testing strategy updates
+
+def allVerticesHave2DistinctNeighbors() -> Tuple[LabeledModel, QuantifiedFormula]:
     s = {"R": 1, "E": 2, "=": 2}
     d = {1,2,3,4,5}
     equality = [[x,x] for x in d]
@@ -85,6 +86,24 @@ def simpleLabeledModelAndNearlyTrueFormula() -> Tuple[LabeledModel, QuantifiedFo
         Conjunction(Atomic("E",[0,1],s),\
         Atomic("E",[0,2],s)))
     f = QuantifiedFormula([True,False,False], mat)
+    return (LabeledModel(d, r, s, True, "foo"), f)
+
+def existsHub() -> Tuple[LabeledModel, QuantifiedFormula]:
+    s = {"E": 2, "=": 2}
+    d = {1,2,3}
+    equality = [[x,x] for x in d]
+    r = {"=": equality, "E": [[1,2],[1,3],[2,3],[2,1],[3,1],[3,2]]}
+    mat = Atomic("E",[0,1],s)
+    f = QuantifiedFormula([False,True], mat)
+    return (LabeledModel(d, r, s, True, "foo"), f)
+
+def existsForallExists() -> Tuple[LabeledModel, QuantifiedFormula]:
+    s = {"R": 3}
+    d = {1,2,3,4}
+    equality = [[x,x] for x in d]
+    r = {"R": [[1,2,2],[1,1,1],[1,3,3]]}
+    mat = Atomic("R",[0,1,2],s)
+    f = QuantifiedFormula([False, True, False], mat)
     return (LabeledModel(d, r, s, True, "foo"), f)
 
 def viewStrategyChange(lm: LabeledModel, f: QuantifiedFormula) -> Tuple[STree, STree]:
