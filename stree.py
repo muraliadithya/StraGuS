@@ -1,14 +1,13 @@
 from __future__ import annotations
 from abc import abstractmethod
-from ast import Assign
-from cProfile import label
-from re import A
+# from ast import Assign
+# from cProfile import label
+# from re import A
 from typing import Tuple, Mapping, List, Union, Callable, Dict, Set, Iterable, Any
 import random
 import itertools
 
 Sig = Dict[str, int]
-
 Prefix = List[bool]
 
 
@@ -30,10 +29,10 @@ class Model:
     # dictionary from names to arities
     sig: Sig
 
-    def __init__(self, dm, rs, sg, name='m0'):
-        self.domain = dm
-        self.rels = rs
-        self.sig = sg
+    def __init__(self, domain, rels, sig, name='m0'):
+        self.domain = domain
+        self.rels = rels
+        self.sig = sig
         self.name = name
 
     # return the list of all assignments for nvars variables
@@ -61,9 +60,8 @@ class Model:
                    and all(len(tup) == sg[name] for tup in interp) \
                    and all(i in dom for tup in interp for i in tup)
 
-        return all(d >= 0 for d in self.domain) and \
-               all(well_formed_interp(name, interp, self.sig, self.domain)
-                   for name, interp in self.rels.items())
+        return all(d >= 0 for d in self.domain) and all(well_formed_interp(name, interp, self.sig, self.domain)
+                                                        for name, interp in self.rels.items())
 
 
 class LabeledModel(Model):
@@ -75,41 +73,44 @@ class LabeledModel(Model):
 
 
 # simple models for testing strategy updates
-
-def allVerticesHave2DistinctNeighbors() -> Tuple[LabeledModel, QuantifiedFormula]:
+def model_all_vertices_2distinct_neighbours() -> Tuple[LabeledModel, QuantifiedFormula]:
     s = {"R": 1, "E": 2, "=": 2}
-    d = {1,2,3,4,5}
-    equality = [[x,x] for x in d]
-    r = {"=": equality,"R": [[1],[2],[3],[4]], "E": [[1,2],[1,3],[2,3],[3,4],[4,5],[5,1]]}
-    mat = Conjunction(\
-        Negation(Atomic("=",[1,2],s)),\
-        Conjunction(Atomic("E",[0,1],s),\
-        Atomic("E",[0,2],s)))
-    f = QuantifiedFormula([True,False,False], mat)
-    return (LabeledModel(d, r, s, True, "foo"), f)
+    d = {1, 2, 3, 4, 5}
+    equality = [[x, x] for x in d]
+    r = {"=": equality, "R": [[1], [2], [3], [4]], "E": [[1, 2], [1, 3], [2, 3], [3, 4], [4, 5], [5, 1]]}
+    mat = Conjunction(
+        Negation(Atomic("=", [1, 2], s)),
+        Conjunction(Atomic("E", [0, 1], s),
+                    Atomic("E", [0, 2], s)))
+    formula = QuantifiedFormula([True, False, False], mat)
+    return LabeledModel(d, r, s, True, "foo"), formula
 
-def existsHub() -> Tuple[LabeledModel, QuantifiedFormula]:
+
+def exists_hub() -> Tuple[LabeledModel, QuantifiedFormula]:
     s = {"E": 2, "=": 2}
-    d = {1,2,3}
-    equality = [[x,x] for x in d]
-    r = {"=": equality, "E": [[1,2],[1,3],[2,3],[2,1],[3,1],[3,2]]}
-    mat = Atomic("E",[0,1],s)
-    f = QuantifiedFormula([False,True], mat)
-    return (LabeledModel(d, r, s, True, "foo"), f)
+    d = {1, 2, 3}
+    equality = [[x, x] for x in d]
+    r = {"=": equality, "E": [[1, 2], [1, 3], [2, 3], [2, 1], [3, 1], [3, 2]]}
+    mat = Atomic("E", [0, 1], s)
+    formula = QuantifiedFormula([False, True], mat)
+    return LabeledModel(d, r, s, True, "foo"), formula
 
-def existsForallExists() -> Tuple[LabeledModel, QuantifiedFormula]:
+
+def exists_forall_exists() -> Tuple[LabeledModel, QuantifiedFormula]:
     s = {"R": 3}
-    d = {1,2,3,4}
-    equality = [[x,x] for x in d]
-    r = {"R": [[1,2,2],[1,1,1],[1,3,3]]}
-    mat = Atomic("R",[0,1,2],s)
-    f = QuantifiedFormula([False, True, False], mat)
-    return (LabeledModel(d, r, s, True, "foo"), f)
+    d = {1, 2, 3, 4}
+    # equality = [[x, x] for x in d]
+    r = {"R": [[1, 2, 2], [1, 1, 1], [1, 3, 3]]}
+    mat = Atomic("R", [0, 1, 2], s)
+    formula = QuantifiedFormula([False, True, False], mat)
+    return LabeledModel(d, r, s, True, "foo"), formula
 
-def viewStrategyChange(lm: LabeledModel, f: QuantifiedFormula) -> Tuple[STree, STree]:
+
+def view_strategy_change(lm: LabeledModel, f: QuantifiedFormula) -> Tuple[STree, STree]:
     before = STree(lm, f.prefix)
     after = update_strategy(f.matrix, before)
-    return (before, after)
+    return before, after
+
 
 class QuantifiedFormula:
     prefix: Prefix
@@ -166,8 +167,7 @@ class Conjunction(QuantifierFreeFormula):
         return f"({self.left} ∧ {self.right})"
 
     def interpret(self, m: Model, a: Assignment):
-        return self.left.interpret(m, a) and \
-               self.right.interpret(m, a)
+        return self.left.interpret(m, a) and self.right.interpret(m, a)
 
 
 class Disjunction(QuantifierFreeFormula):
@@ -230,10 +230,10 @@ sig0 = {"E": 2}
 sig1 = {"E": 2, "R": 1, "P": 3}
 
 # examples of quantified formula
-l1 = Atomic("E", [0,1],sig0)
-phi1 = QuantifiedFormula([True,False], l1)
+l1 = Atomic("E", [0, 1], sig0)
+phi1 = QuantifiedFormula([True, False], l1)
 
-l2 = Atomic("E", [0,0],sig0)
+l2 = Atomic("E", [0, 0], sig0)
 phi2 = QuantifiedFormula([True], l2)
 
 
@@ -256,97 +256,6 @@ def generate_all_tuples(arity: int, d: Iterable) -> List[List[int]]:
     return list(map(lambda x: list(x), itertools.product(d, repeat=arity)))
 
 
-# an STree consists of a model and its tree. Here's the type and printing for
-# the tree part.
-Tree = List[Tuple[int, Any]]
-
-
-def str_of_tree(tree: Tree, pre: Prefix) -> str:
-    def _str_of_tree(tree: Tree, pre: Prefix, depth: int) -> str:
-        if not pre:
-            return ""
-        s = " " * depth
-        if pre[0]:
-            s += "∀\n"
-        else:
-            s += "∃\n"
-        for (i, child) in tree:
-            s += " " * depth + f"|{i}\n" + _str_of_tree(child, pre[1:], depth + 1)
-        return s
-
-    return _str_of_tree(tree, pre, 0)
-
-
-# Prints a tree like this:
-#      [a]
-#     /  \
-#   [b] [c]
-#   /    \
-# [x]   [d,e]
-# 
-# As this:
-# 
-# a
-# |b
-#  |x
-# |c
-#  |d
-#  |e
-
-
-class STree:
-    model: LabeledModel
-    prefix: Prefix
-    tree: Tree
-
-    def __str__(self) -> str:
-        return str_of_tree(self.tree, self.prefix)
-
-    def __init__(self, model: LabeledModel, prefix: Prefix, t: Tree):
-        self.model = model
-        self.prefix = prefix 
-        self.tree = t
-
-    def __init__(self, model: LabeledModel, prefix: Prefix, t: Tree=None):
-        self.model = model
-
-        def construct_tree(dom: Iterable[int], default: int, pre: Prefix) -> Tree:
-            if not pre:
-                return []
-            if pre[0]:  # universal
-                return [(default, construct_tree(dom, default, pre[1:]))]
-            else:  # existential
-                ts = []
-                for a in dom:
-                    ts.append((a, construct_tree(dom, default, pre[1:])))
-                return ts
-
-        # teacher starts with least element of domain
-        self.prefix = prefix
-        if t:
-            self.tree = t
-        else:
-            self.tree = construct_tree(self.model.domain, self.model.least(), prefix)
-
-    # create a new subtree to beat current strategy
-    @staticmethod
-    def construct_new_play(pre: Prefix, matrix: QuantifierFreeFormula, m: Model, partial: Assignment) -> Tree:
-        if not pre:
-            return []
-        if not pre[0]:
-            possible_plays = QuantifiedFormula(pre, matrix).extension(m, pre, partial)
-            assert(possible_plays)
-            play = possible_plays[0]
-            t = STree.construct_new_play(pre[1:], matrix, m, partial+[play])
-            return [(play, t)]
-        else: 
-            ts = []
-            for a in m.domain:
-                ts.append((a, STree.construct_new_play(pre[1:], matrix, m, partial+[a])))
-            return ts
-        
-
-
 # returns random models with distinct names
 def get_models(sz: int, nm: int, sg: Sig) -> Iterable[Model]:
     ms = []
@@ -357,51 +266,94 @@ def get_models(sz: int, nm: int, sg: Sig) -> Iterable[Model]:
     return ms
 
 
-def stragus(ms: Iterable[LabeledModel], prefix: Prefix) -> QuantifiedFormula:
-    def loop(ms: Iterable[LabeledModel], prefix: Prefix, strees: Iterable[STree]):
-        phi = synth(ms, strees)
-        (failures, ok) = verify(strees, phi)
-        if not failures:
-            return QuantifiedFormula(prefix, phi)
+# an STree consists of a model and its tree.
+# The following defines the tree attribute and some utility functions for it
+Tree = List[Tuple[int, Any]]
+
+
+def construct_default_tree(dom: Iterable[int], default: int, pre: Prefix) -> Tree:
+    if not pre:
+        return []
+    if pre[0]:  # universal
+        return [(default, construct_default_tree(dom, default, pre[1:]))]
+    else:  # existential
+        ts = []
+        for a in dom:
+            ts.append((a, construct_default_tree(dom, default, pre[1:])))
+        return ts
+
+
+# Prints a tree like this:
+#      [a]
+#     /  \
+#   [b] [c]
+#   /    \
+# [x]   [d,e]
+#
+# As this:
+#
+# a
+# |b
+#  |x
+# |c
+#  |d
+#  |e
+def _str_of_tree(tree: Tree, pre: Prefix, depth: int) -> str:
+    if not pre:
+        return ""
+    s = " " * depth
+    if pre[0]:
+        s += "∀\n"
+    else:
+        s += "∃\n"
+    for (i, child) in tree:
+        s += " " * depth + f"|{i}\n" + _str_of_tree(child, pre[1:], depth + 1)
+    return s
+
+
+class STree:
+    model: LabeledModel
+    prefix: Prefix
+    tree: Tree
+
+    def __init__(self, model: LabeledModel, prefix: Prefix, t: Tree = None):
+        self.model = model
+        self.prefix = prefix
+        if t:
+            self.tree = t
         else:
-            failures_updated = update_strategies(failures, phi)
-            return loop(ms, prefix, ok + failures_updated)
+            # teacher uses least element of domain: must fix to handle true partial strategy trees
+            self.tree = construct_default_tree(self.model.domain, self.model.least(), prefix)
 
-    strees = initialize_strategies(ms, prefix)
-    return loop(ms, prefix, strees)
+    def __str__(self) -> str:
+        return _str_of_tree(self.tree, self.prefix, depth=0)
 
-
-def initialize_strategies(ms: Iterable[LabeledModel], pre: Prefix) -> Iterable[STree]:
-    return map(lambda m: STree(m, pre) if m.positive else STree(m, flip(pre)), ms)
-
-
-def synth():
-    pass
-
-
-def verify(strees: Iterable[STree], phi: QuantifierFreeFormula) -> Tuple[List[STree], List[Stree]]:
-    failures = []
-    ok = []
-    for stree in strees:
-        if stree.model.positive:
-            if not QuantifiedFormula(stree.prefix, phi).interpret_sentence(stree.model):
-                failures += [stree]
-            else: 
-                ok += [stree]
+    # create a new subtree to beat current strategy
+    @staticmethod
+    def construct_new_play(pre: Prefix, matrix: QuantifierFreeFormula, m: Model, partial: Assignment) -> Tree:
+        if not pre:
+            return []
+        if not pre[0]:
+            possible_plays = QuantifiedFormula(pre, matrix).extension(m, pre, partial)
+            assert possible_plays
+            play = possible_plays[0]
+            t = STree.construct_new_play(pre[1:], matrix, m, partial + [play])
+            return [(play, t)]
         else:
-            if not QuantifiedFormula(stree.prefix, Negation(phi)).interpret_sentence(stree.model):
-                failures += [stree]
-            else: 
-                ok += [stree]
-    return (failures, ok)
-    
+            ts = []
+            for a in m.domain:
+                ts.append((a, STree.construct_new_play(pre[1:], matrix, m, partial + [a])))
+            return ts
+
+
 def update_strategies(failures: Iterable[STree], phi: QuantifierFreeFormula) -> Iterable[STree]:
-    return list(map(lambda st: update_strategy(phi, st)))
+    # @PK: is this what you meant?
+    return list(map(lambda st: update_strategy(phi, st), failures))
     # for stree in failures:
     #     update_strategy(phi, stree)
 
 
-# Precondition: 
+# Precondition:
 # ¬(stree.model ⊧ stree.prefix.  phi) if stree.model.positive
 # ¬(stree.model ⊧ stree.prefix. ¬phi) if stree.model.negative
 def update_strategy(phi: QuantifierFreeFormula, stree: STree) -> STree:
@@ -414,26 +366,17 @@ def update_strategy(phi: QuantifierFreeFormula, stree: STree) -> STree:
     new_tree = walk_tree(stree, prefix_to_check, matrix_to_check)
     return STree(stree.model, stree.prefix, new_tree)
 
-def walk_tree(st: STree, pre: Prefix, matrix: QuantifierFreeFormula) -> Tree:
-    
+
+def walk_tree(st: STree, prefix: Prefix, matrix: QuantifierFreeFormula) -> Tree:
     def rec(t: Tree, partial_assignment: Assignment, pre: Prefix) -> Tree:
-        if not pre: 
-            assert(matrix.interpret(st.model, partial_assignment))
+        if not pre:
+            assert (matrix.interpret(st.model, partial_assignment))
             return [(partial_assignment[-1], [])]
-        if pre[0]: # universal (existential for learner)
-            return list(map(lambda node: \
-              (node[0], rec(node[1], partial_assignment+[node[0]], pre[1:])), t))
-        else: # existential play by teacher, universal for learner
+        if pre[0]:  # universal (existential for learner)
+            return list(map(lambda node: (node[0], rec(node[1], partial_assignment + [node[0]], pre[1:])), t))
+        else:  # existential play by teacher, universal for learner
             # confusing! Maybe 'extension' should be a method of QuantifierFreeFormula
             r = STree.construct_new_play(pre, matrix, st.model, partial_assignment)
-            return t+r
+            return t + r
 
-    return rec(st.tree, [], pre)
-
-
-def main():
-    print("main running...")
-
-
-if __name__ == "__main__":
-    main()
+    return rec(st.tree, [], prefix)

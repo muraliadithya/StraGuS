@@ -1,12 +1,12 @@
 from __future__ import annotations
-from typing import List, Union, Tuple
+from typing import List, Tuple, Iterable
 
 import os
 import subprocess
 import math
 import itertools
 
-from stree import Sig, LabeledModel, Prefix
+from stree import Sig, LabeledModel, Prefix, STree
 
 
 # Preamble introducing model names and such
@@ -54,7 +54,7 @@ def generate_define_fun(symbol: Tuple[str, int], models: List[LabeledModel]):
             if num_interps >= num_total_interps / 2 + 10:  # some slack so we don't recompute for no reason
                 total_interps = set(itertools.product(dom, repeat=arity))
                 rel_interp = total_interps - rel_interp
-                num_interps = len(rel_interp)
+                # num_interps = len(rel_interp)
                 sat_tuples = False
             # Small optimization for unary relations
             if arity == 1:
@@ -73,7 +73,7 @@ def generate_define_fun(symbol: Tuple[str, int], models: List[LabeledModel]):
     return defnstr.format(relname=relname, paramstr=paramstr, interp=interp)
 
 
-def generate_grammar(signature: Sig, quantifier_prefix: List[bool], funcname):
+def generate_grammar(signature: Sig, num_quantifiers: int, funcname):
     grammar_template = """
 ;; Grammar
 (synth-fun {funcname} ((m ModelId) {paramstr}) Bool
@@ -90,7 +90,6 @@ def generate_grammar(signature: Sig, quantifier_prefix: List[bool], funcname):
     )
 )
 """
-    num_quantifiers = len(quantifier_prefix)
     params = [f'x{str(i)}' for i in range(num_quantifiers)]
     paramstr = ' '.join(f'({p} Int)' for p in params)
     atoms = []
@@ -104,8 +103,8 @@ def generate_grammar(signature: Sig, quantifier_prefix: List[bool], funcname):
 
 
 # Setting some options
-logpath = '.logs'
-os.makedirs(logpath, exist_ok=True)
+log_path = '.logs'
+os.makedirs(log_path, exist_ok=True)
 
 
 def synthesize_command(mode):
@@ -121,16 +120,16 @@ def synthesize_command(mode):
 
 # function to construct synthesis constraints using all valuations
 def synthesis_constraints_total(models: List[LabeledModel], prefix: Prefix, funcname: str):
-    def valuations(modelname, domain, quantifiers=None, assignment=None):
+    def valuations(model_name, domain, quantifiers=None, assignment=None):
         if quantifiers is None:
             quantifiers = prefix
         if assignment is None:
             assignment = []
         if not quantifiers:
-            return f"({funcname} {modelname} {' '.join(str(val) for val in assignment)})"
+            return f"({funcname} {model_name} {' '.join(str(val) for val in assignment)})"
         else:
             return f"({'and' if quantifiers[0] else 'or'} " \
-                   f"{' '.join(valuations(modelname, domain, quantifiers[1:], assignment + [elem]) for elem in domain)})"
+                   f"{' '.join(valuations(model_name, domain, quantifiers[1:], assignment + [elem]) for elem in domain)})"
 
     constraints = ''
     for model in models:
@@ -145,20 +144,23 @@ def synthesis_constraints_total(models: List[LabeledModel], prefix: Prefix, func
     return constraints
 
 
-def generate_constraints(models: List[LabeledModel], quantifier_prefix: Prefix, funcname: str, learner: str):
-    if learner == 'total':
-        return synthesis_constraints_total(models, quantifier_prefix, funcname)
-    else:
-        raise ValueError(f'Could not identify learning algorithm {learner}.')
+def generate_constraints(strees: Iterable[STree], funcname: str):
+    pass
 
 
-def synthesize(signature: Sig, models: List[LabeledModel], quantifier_prefix: Prefix, call_name: str,
-               options: dict = None):
+def synthesize(signature: Sig, strategy_trees: Iterable[STree], options: dict = None):
     if options is None:
         options = {}
 
+    call_name = options.get('name', None)
     synth_file = f'synth{"" if call_name is None else "_" + call_name}.sy'
-    synth_file = os.path.join(logpath, synth_file)
+    synth_file = os.path.join(log_path, synth_file)
+
+    models = [stree.model for stree in strategy_trees]
+    num_vars = set(len(stree.prefix) for stree in strategy_trees)
+    if len(num_vars) != 1:
+        raise ValueError("Given strategy trees specify differing number of quantified variables.")
+    num_vars = num_vars.pop()
 
     # Construct the string to be synthesized
     synth_str = ''
@@ -170,9 +172,9 @@ def synthesize(signature: Sig, models: List[LabeledModel], quantifier_prefix: Pr
         synth_str += generate_define_fun(symbol, models) + '\n'
     # Grammar
     funcname = 'formula'
-    synth_str += generate_grammar(signature, quantifier_prefix, funcname)
+    synth_str += generate_grammar(signature, num_vars, funcname)
     # Constraints
-    synth_str += generate_constraints(models, quantifier_prefix, funcname, options.get('learner', 'total'))
+    synth_str += generate_constraints(strategy_trees, funcname)
     # check-synth command
     synth_str += '\n(check-synth)'
     with open(synth_file, 'w') as f:
@@ -185,34 +187,30 @@ def synthesize(signature: Sig, models: List[LabeledModel], quantifier_prefix: Pr
         raise RuntimeError(f'Synthesizer returned error:\n {err}\n')
     formula = out.decode('utf-8')  # convert from bytestr
     formula = formula.split('Bool')[1].strip()[:-1]
-    # Pretty printing for debugging
-    prefix_str = ' '.join(
-        ('A' if quantifier_prefix[i] else 'E') + ' ' + f'x{str(i)}.' for i in range(len(quantifier_prefix)))
-    print(prefix_str, formula)
-    return quantifier_prefix, formula
+    return formula
 
 
-# Tests
-def test_synthesize_1():
-    signature = {'R': 1, 'S': 2}
-    domain = {1, 2}
-
-    # first model
-    R_interp = [[1], [2]]  # this relation is true everywhere in this model
-    S_interp = [[1, 2]]
-    rels = {'R': R_interp, 'S': S_interp}
-    m1 = LabeledModel(domain, rels, signature, is_pos=True, name='m1')
-
-    # second model
-    R_interp = [[1]]
-    S_interp = [[1, 1], [2, 2], [1, 2]]
-    rels = {'R': R_interp, 'S': S_interp}
-    m2 = LabeledModel(domain, rels, signature, is_pos=False, name='m2')
-
-    models = [m1, m2]
-    num_quantifiers = 2
-    quantifier_prefix = [True] * num_quantifiers
-    synthesize(signature, models, quantifier_prefix, call_name='test1', options={'mode': 'basic', 'learner': 'total'})
-
-
-# test_synthesize_1()
+# # Tests
+# def test_synthesize_1():
+#     signature = {'R': 1, 'S': 2}
+#     domain = {1, 2}
+#
+#     # first model
+#     R_interp = [[1], [2]]  # this relation is true everywhere in this model
+#     S_interp = [[1, 2]]
+#     rels = {'R': R_interp, 'S': S_interp}
+#     m1 = LabeledModel(domain, rels, signature, is_pos=True, name='m1')
+#
+#     # second model
+#     R_interp = [[1]]
+#     S_interp = [[1, 1], [2, 2], [1, 2]]
+#     rels = {'R': R_interp, 'S': S_interp}
+#     m2 = LabeledModel(domain, rels, signature, is_pos=False, name='m2')
+#
+#     models = [m1, m2]
+#     num_quantifiers = 2
+#     quantifier_prefix = [True] * num_quantifiers
+#     synthesize(signature, models, quantifier_prefix, call_name='test1', options={'mode': 'basic', 'learner': 'total'})
+#
+#
+# # test_synthesize_1()
