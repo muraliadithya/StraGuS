@@ -237,7 +237,8 @@ def generate_all_tuples(arity: int, d: Iterable) -> List[List[int]]:
     return list(map(lambda x: list(x), itertools.product(d, repeat=arity)))
 
 
-# an STree consists of a model and its strategy tree 
+# an STree consists of a model and its tree. Here's the type and printing for
+# the tree part.
 Tree = List[Tuple[int, Any]]
 
 
