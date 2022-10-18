@@ -69,9 +69,9 @@ class Model:
 class LabeledModel(Model):
     positive: bool
 
-    def __init__(self, dm, rs, sg, b, name):
+    def __init__(self, dm, rs, sg, is_pos, name):
         super().__init__(dm, rs, sg, name)
-        self.positive = b
+        self.positive = is_pos
 
 
 class QuantifiedFormula:
