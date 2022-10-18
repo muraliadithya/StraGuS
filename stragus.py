@@ -26,7 +26,7 @@ def verify(strees: Iterable[STree], phi: QuantifierFreeFormula) -> Tuple[List[ST
     return failures, ok
 
 
-def initialize_strategies(ms: Iterable[LabeledModel], pre: Prefix) -> Iterable[STree]:
+def initialize_strategy_trees(ms: Iterable[LabeledModel], pre: Prefix) -> Iterable[STree]:
     return map(lambda m: STree(m, pre) if m.positive else STree(m, flip(pre)), ms)
 
 
@@ -34,17 +34,26 @@ def stragus(signature: Sig, models: Iterable[LabeledModel], prefix: Prefix, opti
     if options is None:
         options = {}
 
-    def loop(ms: Iterable[LabeledModel], pre: Prefix, strees: Iterable[STree]):
-        phi = synthesize(signature, strees, options=options)
-        (failures, ok) = verify(strees, phi)
-        if not failures:
+    def loop(pre: Prefix, strees: Iterable[STree], phi: QuantifierFreeFormula):
+        updated, ok = try_phi(strees, phi)
+        if not updated:
             return QuantifiedFormula(pre, phi)
         else:
-            failures_updated = update_strategies(failures, phi)
-            return loop(ms, pre, ok + failures_updated)
+            phi = synthesize(signature, updated + ok, options=options)
+            return loop(pre, strees, phi)
 
-    strategy_trees = initialize_strategies(models, prefix)
-    return loop(models, prefix, strategy_trees)
+    def try_phi(strees: Iterable[STree], phi: QuantifierFreeFormula) -> Tuple[Iterable[STree], Iterable[STree]]:
+        (failures, ok) = verify(strees, phi)
+        failures_updated = update_strategies(failures, phi)
+        return failures_updated, ok 
+
+    strategy_trees = initialize_strategy_trees(models, prefix)
+    phi = Top # @AD add your Top here, same for the lone Bot below
+    updated, ok = try_phi(strategy_trees, phi)
+    if not updated:
+        return QuantifiedFormula(prefix, phi)
+    else:
+        return loop(prefix, updated + ok, Bot)
 
 
 if __name__ == "__main__":

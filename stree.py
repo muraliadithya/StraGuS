@@ -268,15 +268,15 @@ def get_models(sz: int, nm: int, sg: Sig) -> Iterable[Model]:
 Tree = List[Tuple[int, Any]]
 
 
-def construct_default_tree(dom: Iterable[int], default: int, pre: Prefix) -> Tree:
+def construct_default_tree(dom: Iterable[int], pre: Prefix) -> Tree:
     if not pre:
         return []
-    if pre[0]:  # universal
-        return [(default, construct_default_tree(dom, default, pre[1:]))]
-    else:  # existential
+    if pre[0]:  # universals wait for a mistake to grow a tree below
+        return [] # 
+    else:  # existentials get scaffolding
         ts = []
-        for a in dom:
-            ts.append((a, construct_default_tree(dom, default, pre[1:])))
+        for a in dom: 
+            ts.append((a, construct_default_tree(dom, pre[1:])))
         return ts
 
 
@@ -319,8 +319,7 @@ class STree:
         if t:
             self.tree = t
         else:
-            # teacher uses least element of domain: must fix to handle true partial strategy trees
-            self.tree = construct_default_tree(self.model.domain, self.model.least(), prefix)
+            self.tree = construct_default_tree(self.model.domain, prefix)
 
     def __str__(self) -> str:
         return _str_of_tree(self.tree, self.prefix, depth=0)
