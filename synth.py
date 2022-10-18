@@ -8,6 +8,8 @@ import itertools
 
 from stree import Sig, LabeledModel, Prefix, STree
 
+from utils import parse_qf_formula
+
 
 # Preamble introducing model names and such
 def preamble(model_names: List[str]):
@@ -35,7 +37,7 @@ def generate_define_fun(symbol: Tuple[str, int], models: List[LabeledModel]):
     params = [f'x{str(i)}' for i in range(arity)]
     paramstr = ' '.join(f'({p} Int)' for p in params)
     interp = ""
-    model_interp = "\n(and (= m {name})\n       {valuation})"
+    model_interp = "\n(and (= mid {name})\n       {valuation})"
     for model in models:
         name = model.name
         dom = model.domain
@@ -96,7 +98,7 @@ def generate_grammar(signature: Sig, num_quantifiers: int, funcname):
     for symbol in signature.items():
         relname, arity = symbol
         args = itertools.product(params, repeat=arity)
-        atoms.extend([f"({relname} m {' '.join(arg)})" for arg in args])
+        atoms.extend([f"({relname} mid {' '.join(arg)})" for arg in args])
     indent = '      '
     atomstr = '\n'.join(indent + atom for atom in atoms)
     return grammar_template.format(funcname=funcname, paramstr=paramstr, atomstr=atomstr)
@@ -145,7 +147,7 @@ def synthesis_constraints_total(models: List[LabeledModel], prefix: Prefix, func
 
 
 def generate_constraints(strees: Iterable[STree], funcname: str):
-    pass
+    raise NotImplementedError
 
 
 def synthesize(signature: Sig, strategy_trees: Iterable[STree], options: dict = None):
@@ -185,32 +187,44 @@ def synthesize(signature: Sig, strategy_trees: Iterable[STree], options: dict = 
     out, err = proc.communicate()
     if err:
         raise RuntimeError(f'Synthesizer returned error:\n {err}\n')
-    formula = out.decode('utf-8')  # convert from bytestr
-    formula = formula.split('Bool')[1].strip()[:-1]
-    return formula
+    formula_str = out.decode('utf-8')  # convert from bytestr
+    formula_str = formula_str.split('Bool')[1].strip()[:-1].replace(' mid ', ' ')
+    params = None # get them from
+    return parse_qf_formula(signature, params, formula_str)
 
 
-# # Tests
-# def test_synthesize_1():
-#     signature = {'R': 1, 'S': 2}
-#     domain = {1, 2}
-#
-#     # first model
-#     R_interp = [[1], [2]]  # this relation is true everywhere in this model
-#     S_interp = [[1, 2]]
-#     rels = {'R': R_interp, 'S': S_interp}
-#     m1 = LabeledModel(domain, rels, signature, is_pos=True, name='m1')
-#
-#     # second model
-#     R_interp = [[1]]
-#     S_interp = [[1, 1], [2, 2], [1, 2]]
-#     rels = {'R': R_interp, 'S': S_interp}
-#     m2 = LabeledModel(domain, rels, signature, is_pos=False, name='m2')
-#
-#     models = [m1, m2]
-#     num_quantifiers = 2
-#     quantifier_prefix = [True] * num_quantifiers
-#     synthesize(signature, models, quantifier_prefix, call_name='test1', options={'mode': 'basic', 'learner': 'total'})
-#
-#
-# # test_synthesize_1()
+# Tests
+def test_synthesize_1():
+    signature = {'R': 1, 'S': 2}
+    domain = {1, 2}
+
+    # first model
+    R_interp = [[1], [2]]  # this relation is true everywhere in this model
+    S_interp = [[1, 2]]
+    rels = {'R': R_interp, 'S': S_interp}
+    m1 = LabeledModel(domain, rels, signature, is_pos=True, name='m1')
+
+    # second model
+    R_interp = [[1]]
+    S_interp = [[1, 1], [2, 2], [1, 2]]
+    rels = {'R': R_interp, 'S': S_interp}
+    m2 = LabeledModel(domain, rels, signature, is_pos=False, name='m2')
+
+    num_quantifiers = 2
+    quantifier_prefix = [True, False]
+
+    # full tree of plays
+    def generate_full_tree(height):
+        if height == 0:
+            return []
+        return [(d, generate_full_tree(height - 1)) for d in domain]
+    full_tree = generate_full_tree()
+
+    # strategy trees
+    stree1 = STree(m1, quantifier_prefix, full_tree)
+    stree2 = STree(m2, quantifier_prefix, full_tree)
+    strees = [stree1, stree2]
+    synthesize(signature, strees, options={'mode': 'basic', 'learner': 'total', 'name': 'test1'})
+
+
+# test_synthesize_1()
