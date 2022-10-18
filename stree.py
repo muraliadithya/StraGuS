@@ -223,6 +223,28 @@ class Atomic(QuantifierFreeFormula):
         return valuation in m.rels[self.name]
 
 
+class Top(QuantifierFreeFormula):
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self) -> str:
+        return "True"
+
+    def interpret(self, m: Model, a: Assignment) -> bool:
+        return True
+
+
+class Bot(QuantifierFreeFormula):
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self) -> str:
+        return "False"
+
+    def interpret(self, m: Model, a: Assignment) -> bool:
+        return False
+
+
 sig0 = {"E": 2}
 sig1 = {"E": 2, "R": 1, "P": 3}
 
@@ -272,10 +294,10 @@ def construct_default_tree(dom: Iterable[int], pre: Prefix) -> Tree:
     if not pre:
         return []
     if pre[0]:  # universals wait for a mistake to grow a tree below
-        return [] # 
+        return [] #
     else:  # existentials get scaffolding
         ts = []
-        for a in dom: 
+        for a in dom:
             ts.append((a, construct_default_tree(dom, pre[1:])))
         return ts
 
@@ -356,7 +378,7 @@ class STree:
         if not pre[0]:
             possible_plays = QuantifiedFormula(pre, matrix).extension(m, pre, partial)
             assert possible_plays # if we reach this point then we already found a way to make formula false
-            play = possible_plays[0] 
+            play = possible_plays[0]
             t = STree.construct_new_play(pre[1:], matrix, m, partial + [play])
             return [(play, t)]
         else:

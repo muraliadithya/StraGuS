@@ -4,7 +4,7 @@ from typing import Iterable, List, Tuple
 import argparse
 
 from stree import Sig, LabeledModel, Prefix, QuantifierFreeFormula, QuantifiedFormula, STree
-from stree import Negation  # instance of QuantifierFreeFormula
+from stree import Negation, Top, Bot  # instance of QuantifierFreeFormula
 from stree import update_strategies, flip
 from synth import synthesize
 
@@ -48,12 +48,12 @@ def stragus(signature: Sig, models: Iterable[LabeledModel], prefix: Prefix, opti
         return failures_updated, ok 
 
     strategy_trees = initialize_strategy_trees(models, prefix)
-    phi = Top # @AD add your Top here, same for the lone Bot below
+    phi = Top()
     updated, ok = try_phi(strategy_trees, phi)
     if not updated:
         return QuantifiedFormula(prefix, phi)
     else:
-        return loop(prefix, updated + ok, Bot)
+        return loop(prefix, updated + ok, Bot())
 
 
 if __name__ == "__main__":
