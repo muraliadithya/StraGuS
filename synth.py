@@ -226,6 +226,6 @@ def test_synthesize_1():
     stree1 = STree(m1, quantifier_prefix, full_tree)
     stree2 = STree(m2, quantifier_prefix, full_tree)
     strees = [stree1, stree2]
-    formula = synthesize(signature, strees, options={'mode': 'basic', 'learner': 'total', 'name': 'test1'})
+    formula = synthesize(signature, strees, options={'mode': 'basic', 'name': 'test1'})
     print(formula)
 
