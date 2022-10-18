@@ -6,7 +6,7 @@ import subprocess
 import math
 import itertools
 
-from stree import Sig, LabeledModel, Prefix, STree
+from stree import Sig, LabeledModel, Prefix, STree, Tree
 
 from utils import parse_qf_formula
 
@@ -28,7 +28,7 @@ def preamble(model_names: List[str]):
 def generate_define_fun(symbol: Tuple[str, int], models: List[LabeledModel]):
     # For now a symbol is just a name and an arity: they're all relations over integers as the SMT type
     defnstr = """
-(define-fun {relname} ((m ModelId) {paramstr}) Bool
+(define-fun {relname} ((mid ModelId) {paramstr}) Bool
 (or
 {interp}
 ))
@@ -78,7 +78,7 @@ def generate_define_fun(symbol: Tuple[str, int], models: List[LabeledModel]):
 def generate_grammar(signature: Sig, num_quantifiers: int, funcname):
     grammar_template = """
 ;; Grammar
-(synth-fun {funcname} ((m ModelId) {paramstr}) Bool
+(synth-fun {funcname} ((mid ModelId) {paramstr}) Bool
     ((Start Bool))
 
     (( Start Bool (
@@ -101,7 +101,7 @@ def generate_grammar(signature: Sig, num_quantifiers: int, funcname):
         atoms.extend([f"({relname} mid {' '.join(arg)})" for arg in args])
     indent = '      '
     atomstr = '\n'.join(indent + atom for atom in atoms)
-    return grammar_template.format(funcname=funcname, paramstr=paramstr, atomstr=atomstr)
+    return params, grammar_template.format(funcname=funcname, paramstr=paramstr, atomstr=atomstr)
 
 
 # Setting some options
@@ -120,34 +120,36 @@ def synthesize_command(mode):
     return command
 
 
-# function to construct synthesis constraints using all valuations
-def synthesis_constraints_total(models: List[LabeledModel], prefix: Prefix, funcname: str):
-    def valuations(model_name, domain, quantifiers=None, assignment=None):
-        if quantifiers is None:
-            quantifiers = prefix
-        if assignment is None:
-            assignment = []
-        if not quantifiers:
-            return f"({funcname} {model_name} {' '.join(str(val) for val in assignment)})"
-        else:
-            return f"({'and' if quantifiers[0] else 'or'} " \
-                   f"{' '.join(valuations(model_name, domain, quantifiers[1:], assignment + [elem]) for elem in domain)})"
+# helper function for stree_to_constraint
+def _stree_to_constraint_aux(tree: Tree, quantifiers: Prefix, funcname: str, model_name: str, assignment: List = None):
+    if assignment is None:
+        assignment = []
+    if not quantifiers:
+        return f"({funcname} {model_name} {' '.join(str(val) for val in assignment)})"
+    else:
+        assert tree
+        operator = 'and' if quantifiers[0] else 'or'
+        operands = ' '.join(_stree_to_constraint_aux(subtree, quantifiers[1:], funcname, model_name, assignment + [root])
+                            for root, subtree in tree)
+        return f"({operator} {operands})"
 
-    constraints = ''
-    for model in models:
-        name = model.name
-        is_pos = model.positive
-        model_constraint = valuations(name, model.domain)
-        if not is_pos:
-            # negate the constraint
-            model_constraint = f'(not {model_constraint})'
-        comment_str = f';; constraint for model {name}'
-        constraints += f'{comment_str}\n(constraint {model_constraint})\n'
-    return constraints
+
+# function to construct the constraint corresponding to a strategy tree
+def stree_to_constraint(strat: STree, funcname: str):
+    model = strat.model
+    name = model.name
+    is_pos = model.positive
+    strategy_constraint = _stree_to_constraint_aux(strat.tree, strat.prefix, funcname, model.name)
+    if not is_pos:
+        # negate the constraint
+        strategy_constraint = f'(not {strategy_constraint})'
+    comment_str = f';; constraint for model {name}'
+    constraint = f'{comment_str}\n(constraint {strategy_constraint})\n'
+    return constraint
 
 
 def generate_constraints(strees: Iterable[STree], funcname: str):
-    raise NotImplementedError
+    return ''.join(stree_to_constraint(strat, funcname) for strat in strees)
 
 
 def synthesize(signature: Sig, strategy_trees: Iterable[STree], options: dict = None):
@@ -164,7 +166,7 @@ def synthesize(signature: Sig, strategy_trees: Iterable[STree], options: dict = 
         raise ValueError("Given strategy trees specify differing number of quantified variables.")
     num_vars = num_vars.pop()
 
-    # Construct the string to be synthesized
+    # Construct the input file for sygus solvers
     synth_str = ''
     # Preamble
     synth_str += preamble([model.name for model in models])
@@ -174,7 +176,8 @@ def synthesize(signature: Sig, strategy_trees: Iterable[STree], options: dict = 
         synth_str += generate_define_fun(symbol, models) + '\n'
     # Grammar
     funcname = 'formula'
-    synth_str += generate_grammar(signature, num_vars, funcname)
+    formal_params, grammar_str = generate_grammar(signature, num_vars, funcname)
+    synth_str += grammar_str
     # Constraints
     synth_str += generate_constraints(strategy_trees, funcname)
     # check-synth command
@@ -187,10 +190,9 @@ def synthesize(signature: Sig, strategy_trees: Iterable[STree], options: dict = 
     out, err = proc.communicate()
     if err:
         raise RuntimeError(f'Synthesizer returned error:\n {err}\n')
-    formula_str = out.decode('utf-8')  # convert from bytestr
-    formula_str = formula_str.split('Bool')[1].strip()[:-1].replace(' mid ', ' ')
-    params = None # get them from
-    return parse_qf_formula(signature, params, formula_str)
+    out = out.decode('utf-8')  # convert from bytestr
+    formula_str = out.split('Bool')[1].strip()[:-1].replace(' mid ', ' ')
+    return parse_qf_formula(signature, formal_params, formula_str)
 
 
 # Tests
@@ -214,7 +216,7 @@ def test_synthesize_1():
     quantifier_prefix = [True, False]
 
     # full tree of plays
-    def generate_full_tree(height):
+    def generate_full_tree(height=num_quantifiers):
         if height == 0:
             return []
         return [(d, generate_full_tree(height - 1)) for d in domain]
@@ -224,7 +226,6 @@ def test_synthesize_1():
     stree1 = STree(m1, quantifier_prefix, full_tree)
     stree2 = STree(m2, quantifier_prefix, full_tree)
     strees = [stree1, stree2]
-    synthesize(signature, strees, options={'mode': 'basic', 'learner': 'total', 'name': 'test1'})
+    formula = synthesize(signature, strees, options={'mode': 'basic', 'learner': 'total', 'name': 'test1'})
+    print(formula)
 
-
-# test_synthesize_1()
