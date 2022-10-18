@@ -219,11 +219,8 @@ class Atomic(QuantifierFreeFormula):
         assert (self.sig == m.sig)
         assert (self.name in self.sig)
         assert (len(self.args) == self.sig[self.name])
-        return substitute(a, self.args) in m.rels[self.name]
-
-
-def substitute(gamma: Assignment, args: List[int]):
-    return [gamma[arg] for arg in args]
+        valuation = [a[arg] for arg in self.args]
+        return valuation in m.rels[self.name]
 
 
 sig0 = {"E": 2}
