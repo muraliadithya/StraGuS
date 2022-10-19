@@ -82,3 +82,28 @@ def test_stragus_1():
     models = [m1, m2]
     formula = stragus(signature, models, quantifier_prefix, options={'mode': 'basic'})
     print(formula)
+
+
+def test_stragus_hub():
+    signature = {'E': 2}
+    model_size = 5
+    domain = set(range(model_size))
+
+    # first model: hub
+    # every element is connected to every other element
+    hub = list(domain)[0]
+    E_interp = [[elem1, elem2] for elem1 in domain for elem2 in domain]
+    rels = {'E': E_interp}
+    m1 = LabeledModel(domain, rels, signature, is_pos=True, name='m1')
+
+    # second model: not a hub
+    # every element is not connected to its 'next' element, but is connected to everything else
+    E_interp = [[elem1, elem2] for elem1 in domain for elem2 in domain if elem2 != (elem1 + 1) % model_size]
+    rels = {'E': E_interp}
+    m2 = LabeledModel(domain, rels, signature, is_pos=False, name='m2')
+
+    num_quantifiers = 2
+    quantifier_prefix = [False, True]
+    models = [m1, m2]
+    formula = stragus(signature, models, quantifier_prefix, options={'mode': 'basic'})
+    print(formula)
