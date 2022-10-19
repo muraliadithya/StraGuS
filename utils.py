@@ -22,8 +22,8 @@ class QFFormulaParser:
         AndOp = pp.Literal('and').suppress()
         OrOp = pp.Literal('or').suppress()
         NotOp = pp.Literal('not').suppress()
-        TrueConst = pp.Literal('true')
-        FalseConst = pp.Literal('false')
+        TrueConst = pp.Literal('true').suppress()
+        FalseConst = pp.Literal('false').suppress()
 
         BasicSymbol = pp.Word(pp.alphanums)
 
