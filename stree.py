@@ -294,7 +294,7 @@ def construct_default_tree(dom: Iterable[int], pre: Prefix) -> Tree:
     if not pre:
         return []
     if pre[0]:  # universals wait for a mistake to grow a tree below
-        return [] #
+        return []
     else:  # existentials get scaffolding
         ts = []
         for a in dom:
@@ -348,17 +348,17 @@ class STree:
 
     @staticmethod
     def play_exists_already(t: Tree, n: int) -> bool:
-        return any([n == x for (x,_) in t])
+        return any([n == x for (x, _) in t])
 
     @staticmethod
     def plays_at_level(t: Tree) -> List[int]:
-        return [n for (n,_) in t]
+        return [n for (n, _) in t]
 
     @staticmethod
     def descend(t: Tree, n: int) -> Tree:
         assert STree.play_exists_already(t, n)
-        tmp = [r for (x,r) in t if x == n]
-        assert (len(tmp)==1)
+        tmp = [r for (x, r) in t if x == n]
+        assert (len(tmp) == 1)
         return tmp[0]
 
     @staticmethod
@@ -366,7 +366,7 @@ class STree:
         # new_tree = []
         # for (x,c) in t:
         #     new_tree
-        return [(x,r) if x == n else (x,c) for (x,c) in t]
+        return [(x, r) if x == n else (x, c) for (x, c) in t]
 
     # Create a new subtree to beat current strategy. Example:
     # ∃x∀y∃z∀w.φ(x,y,z,w) is false in a positive model. We are finding a value
@@ -377,7 +377,7 @@ class STree:
             return []
         if not pre[0]:
             possible_plays = QuantifiedFormula(pre, matrix).extension(m, pre, partial)
-            assert possible_plays # if we reach this point then we already found a way to make formula false
+            assert possible_plays  # if we reach this point then we already found a way to make formula false
             play = possible_plays[0]
             t = STree.construct_new_play(pre[1:], matrix, m, partial + [play])
             return [(play, t)]
@@ -418,16 +418,15 @@ def walk_tree(st: STree, prefix: Prefix, matrix: QuantifierFreeFormula) -> Tree:
             return list(map(lambda node: (node[0], rec(node[1], partial_assignment + [node[0]], pre[1:])), t))
         else:  # existential teacher, universal learner
             possible_plays = QuantifiedFormula(pre, matrix).extension(st.model, pre, partial_assignment)
-            assert possible_plays # if we reach this point then we already found a way to make formula false
+            assert possible_plays  # if we reach this point then we already found a way to make formula false
             intersection = set(possible_plays) & set(STree.plays_at_level(t))
-            if intersection: # can avoid making a new play at the current level
+            if intersection:  # can avoid making a new play at the current level
                 play = list(intersection)[0]
                 # descend along an old play and update somewhere deeper
                 r = rec(STree.descend(t, play), partial_assignment + [play], pre[1:])
                 return STree.replace(t, play, r)
-            else: # create a new play at current level
+            else:  # create a new play at current level
                 play = possible_plays[0]
                 r = STree.construct_new_play(pre[1:], matrix, st.model, partial_assignment + [play])
-                return t + [(play,r)]
-
+                return t + [(play, r)]
     return rec(st.tree, [], prefix)
