@@ -7,6 +7,7 @@ import math
 import itertools
 
 from stree import Sig, LabeledModel, Prefix, STree, Tree
+from stree import flip
 
 from utils import parse_qf_formula
 
@@ -122,15 +123,20 @@ def synthesize_command(options):
 
 
 # helper function for stree_to_constraint
-def _stree_to_constraint_aux(tree: Tree, quantifiers: Prefix, funcname: str, model_name: str, assignment: List = None):
+def _stree_to_constraint_aux(tree: Tree, quantifiers: Prefix, funcname: str, model_name: str,
+                             negated_atoms=False, assignment: List = None):
     if assignment is None:
         assignment = []
     if not quantifiers:
-        return f"({funcname} {model_name} {' '.join(str(val) for val in assignment)})"
+        atom_str = f"({funcname} {model_name} {' '.join(str(val) for val in assignment)})"
+        if negated_atoms:
+            atom_str = f"(not {atom_str})"
+        return atom_str
     else:
         assert tree
         operator = 'and' if quantifiers[0] else 'or'
-        operands = ' '.join(_stree_to_constraint_aux(subtree, quantifiers[1:], funcname, model_name, assignment + [root])
+        operands = ' '.join(_stree_to_constraint_aux(subtree, quantifiers[1:], funcname, model_name,
+                                                     negated_atoms, assignment + [root])
                             for root, subtree in tree)
         return f"({operator} {operands})"
 
@@ -139,11 +145,8 @@ def _stree_to_constraint_aux(tree: Tree, quantifiers: Prefix, funcname: str, mod
 def stree_to_constraint(strat: STree, funcname: str):
     model = strat.model
     name = model.name
-    is_pos = model.positive
-    strategy_constraint = _stree_to_constraint_aux(strat.tree, strat.prefix, funcname, model.name)
-    if not is_pos:
-        # negate the constraint
-        strategy_constraint = f'(not {strategy_constraint})'
+    is_neg = not model.positive
+    strategy_constraint = _stree_to_constraint_aux(strat.tree, strat.prefix, funcname, model.name, negated_atoms=is_neg)
     comment_str = f';; constraint for model {name}'
     constraint = f'{comment_str}\n(constraint {strategy_constraint})\n'
     return constraint
@@ -253,7 +256,7 @@ def test_synthesize_hub():
 
     # strategy trees
     stree1 = STree(m1, quantifier_prefix, full_tree)
-    stree2 = STree(m2, quantifier_prefix, full_tree)
+    stree2 = STree(m2, flip(quantifier_prefix), full_tree)
     strees = [stree1, stree2]
     formula = synthesize(signature, strees, options={'mode': 'basic', 'name': 'test1'})
     print(formula)
