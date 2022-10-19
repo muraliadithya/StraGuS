@@ -22,7 +22,7 @@ class QFFormulaParser:
         AndOp = pp.Literal('and').suppress()
         OrOp = pp.Literal('or').suppress()
         NotOp = pp.Literal('not').suppress()
-        TrueConst = pp.Literal('true') # @AM, removed suppress() here, look ok?
+        TrueConst = pp.Literal('true')
         FalseConst = pp.Literal('false')
 
         BasicSymbol = pp.Word(pp.alphanums)
@@ -52,7 +52,7 @@ class QFFormulaParser:
         def _parse_conjunction_formula(string, loc, tokens):
             num_args = len(tokens)
             if num_args == 0:
-                return Top
+                return Top()
             elif num_args == 1:
                 return tokens[0]
             else:
@@ -65,7 +65,7 @@ class QFFormulaParser:
         def _parse_disjunction_formula(string, loc, tokens):
             num_args = len(tokens)
             if num_args == 0:
-                return Top
+                return Top()
             elif num_args == 1:
                 return tokens[0]
             else:
