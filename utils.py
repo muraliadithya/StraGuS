@@ -98,3 +98,9 @@ def test_parser_1():
     print(formula1)
 
 
+# some general utilities
+# full tree of plays
+def generate_full_tree(height, domain):
+    if height == 0:
+        return []
+    return [(d, generate_full_tree(height - 1, domain)) for d in domain]
