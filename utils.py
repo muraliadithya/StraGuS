@@ -2,8 +2,9 @@ from __future__ import annotations
 from typing import List
 
 import pyparsing as pp
+import json
 
-from stree import Sig, QuantifierFreeFormula
+from stree import Sig, QuantifierFreeFormula, LabeledModel
 from stree import Top, Bot, Atomic, Conjunction, Disjunction, Negation
 
 
@@ -96,3 +97,16 @@ def generate_full_tree(height, domain):
     if height == 0:
         return []
     return [(d, generate_full_tree(height - 1, domain)) for d in domain]
+
+
+# benchmark loader
+def loader_json_string(jsonstr):
+    bench_dict = json.loads(jsonstr)
+    signature = bench_dict['sig']
+    prefix = bench_dict['prefix']
+    model_specs = bench_dict['models']
+    models = [LabeledModel(set(spec['domain']), spec['rels'], signature, spec['is_pos'], name)
+              for name, spec in model_specs.items()]
+    groundtruth = parse_qf_formula(signature, *bench_dict['groundtruth'])
+    benchmark = {'signature': signature, 'models': models, 'prefix': prefix, 'groundtruth': groundtruth}
+    return benchmark
