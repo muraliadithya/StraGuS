@@ -1,3 +1,5 @@
 """
-Empy init file to make this directory a package.
+Init file
 """
+
+__name__ = "stragus"
