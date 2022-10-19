@@ -34,12 +34,12 @@ def stragus(signature: Sig, models: Iterable[LabeledModel], prefix: Prefix, opti
     if options is None:
         options = {}
 
-    def loop(pre: Prefix, strees: Iterable[STree], phi: QuantifierFreeFormula):
+    def loop(pre: Prefix, strees: Iterable[STree], phi: QuantifierFreeFormula, counter=0):
         updated, ok = try_phi(strees, phi)
         if not updated:
             return QuantifiedFormula(pre, phi)
         else:
-            phi = synthesize(signature, updated + ok, options=options)
+            phi = synthesize(signature, updated + ok, options={**options, 'name': f'synth{str(counter)}'})
             return loop(pre, strees, phi)
 
     def try_phi(strees: Iterable[STree], phi: QuantifierFreeFormula) -> Tuple[Iterable[STree], Iterable[STree]]:
