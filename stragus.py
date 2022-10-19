@@ -54,7 +54,7 @@ def stragus(signature: Sig, models: Iterable[LabeledModel], prefix: Prefix, opti
             return QuantifiedFormula(pre, phi)
         else:
             phi = synthesize(signature, updated + ok, options={**options, 'name': f'synth{str(counter)}'})
-            return loop(pre, strees, phi)
+            return loop(pre, strees, phi, counter + 1)
 
     strategy_trees = initialize_strategy_trees(models, prefix)
     phi = Top()
