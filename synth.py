@@ -136,7 +136,10 @@ def _stree_to_constraint_aux(tree: Tree, quantifiers: Prefix, funcname: str, mod
             atom_str = f"(not {atom_str})"
         return atom_str
     else:
-        assert tree
+        try:
+            assert tree
+        except:
+            pass
         operator = 'and' if quantifiers[0] else 'or'
         operands = ' '.join(_stree_to_constraint_aux(subtree, quantifiers[1:], funcname, model_name,
                                                      negated_atoms, assignment + [root])

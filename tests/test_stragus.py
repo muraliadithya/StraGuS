@@ -1,6 +1,9 @@
+import random
+
 from stree import *
 from utils import *
 from stragus import stragus
+from stree import random_model
 
 
 # hubs
@@ -53,5 +56,28 @@ def test_stragus_hub():
     num_quantifiers = 2
     quantifier_prefix = [False, True]
     models = [m1, m2]
+    formula = stragus(signature, models, quantifier_prefix, options={'mode': 'basic'})
+    print(formula)
+
+
+def test_stragus_hub_randmodels():
+    signature = {'E': 2}
+    model_size = 5
+    num_models = 5
+
+    base_models = [random_model(model_size, signature) for _ in range(num_models)]
+    neg_models = []
+    pos_models = []
+    for i in range(len(base_models)):
+        base_model = base_models[i]
+        domain = base_model.domain
+        rels = base_model.rels
+        neg_models.append(LabeledModel(domain, rels, signature, is_pos=False, name=f"n{str(i)}"))
+        hub = random.choice(list(base_model.domain))
+        rels['E'].extend([hub, d] for d in domain)
+        pos_models.append(LabeledModel(domain, rels, signature, is_pos=True, name=f"p{str(i)}"))
+
+    quantifier_prefix = [False, True]
+    models = pos_models + neg_models
     formula = stragus(signature, models, quantifier_prefix, options={'mode': 'basic'})
     print(formula)
