@@ -63,8 +63,8 @@ class Model:
 class LabeledModel(Model):
     positive: bool
 
-    def __init__(self, dm, rs, sg, is_pos, name):
-        super().__init__(dm, rs, sg, name)
+    def __init__(self, domain, rels, signature, is_pos, name):
+        super().__init__(domain, rels, signature, name)
         self.positive = is_pos
 
 
