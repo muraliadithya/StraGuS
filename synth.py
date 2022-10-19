@@ -109,7 +109,8 @@ log_path = '.logs'
 os.makedirs(log_path, exist_ok=True)
 
 
-def synthesize_command(mode):
+def synthesize_command(options):
+    mode = options.get('mode', 'basic')
     if mode == 'basic':
         command = './mini-sygus/scripts/minisy {}'
     # Enumerative mode not supported for reading formulas from stdout in stream
@@ -185,7 +186,7 @@ def synthesize(signature: Sig, strategy_trees: Iterable[STree], options: dict = 
     with open(synth_file, 'w') as f:
         f.write(synth_str)
 
-    command = synthesize_command(options.get('mode', 'basic'))
+    command = synthesize_command(options)
     proc = subprocess.Popen(command.format(synth_file), stdout=subprocess.PIPE, shell=True)
     out, err = proc.communicate()
     if err:
