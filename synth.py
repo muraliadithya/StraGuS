@@ -3,13 +3,21 @@ from typing import List, Tuple, Iterable
 
 import os
 import subprocess
+import importlib.resources as importlib_resources
 import math
 import itertools
 
 from stree import Sig, LabeledModel, Prefix, STree, Tree
-from stree import flip
 
 from utils import parse_qf_formula
+
+
+# some essential constants
+with importlib_resources.path('mini-sygus', '__init__.py') as p:
+    minisy_dir = os.path.dirname(p)
+    minisy_path = os.path.join(minisy_dir, 'scripts', 'minisy')
+log_path = '.logs'
+os.makedirs(log_path, exist_ok=True)
 
 
 # Preamble introducing model names and such
@@ -105,15 +113,10 @@ def generate_grammar(signature: Sig, num_quantifiers: int, funcname):
     return params, grammar_template.format(funcname=funcname, paramstr=paramstr, atomstr=atomstr)
 
 
-# Setting some options
-log_path = '.logs'
-os.makedirs(log_path, exist_ok=True)
-
-
 def synthesize_command(options):
     mode = options.get('mode', 'basic')
     if mode == 'basic':
-        command = './mini-sygus/scripts/minisy {}'
+        command = str(minisy_path) + ' {}'
     # Enumerative mode not supported for reading formulas from stdout in stream
     # elif mode == 'enum':
     #     command = 'cvc4 --lang=sygus2 --stream {}'
@@ -197,66 +200,3 @@ def synthesize(signature: Sig, strategy_trees: Iterable[STree], options: dict = 
     out = out.decode('utf-8')  # convert from bytestr
     formula_str = out.split('Bool')[1].strip()[:-1].replace(' mid ', ' ')
     return parse_qf_formula(signature, formal_params, formula_str)
-
-
-# Tests
-def test_synthesize_1():
-    signature = {'R': 1, 'S': 2}
-    domain = {1, 2}
-
-    # first model
-    R_interp = [[1], [2]]  # this relation is true everywhere in this model
-    S_interp = [[1, 2]]
-    rels = {'R': R_interp, 'S': S_interp}
-    m1 = LabeledModel(domain, rels, signature, is_pos=True, name='m1')
-
-    # second model
-    R_interp = [[1]]
-    S_interp = [[1, 1], [2, 2], [1, 2]]
-    rels = {'R': R_interp, 'S': S_interp}
-    m2 = LabeledModel(domain, rels, signature, is_pos=False, name='m2')
-
-    num_quantifiers = 2
-    quantifier_prefix = [True, False]
-
-    from utils import generate_full_tree
-    full_tree = generate_full_tree(num_quantifiers, domain)
-
-    # strategy trees
-    stree1 = STree(m1, quantifier_prefix, full_tree)
-    stree2 = STree(m2, quantifier_prefix, full_tree)
-    strees = [stree1, stree2]
-    formula = synthesize(signature, strees, options={'mode': 'basic', 'name': 'test1'})
-    print(formula)
-
-
-def test_synthesize_hub():
-    signature = {'E': 2}
-    model_size = 5
-    domain = set(range(model_size))
-
-    # first model: hub
-    # every element is connected to every other element
-    hub = list(domain)[0]
-    E_interp = [[elem1, elem2] for elem1 in domain for elem2 in domain]
-    rels = {'E': E_interp}
-    m1 = LabeledModel(domain, rels, signature, is_pos=True, name='m1')
-
-    # second model: not a hub
-    # every element is not connected to its 'next' element, but is connected to everything else
-    E_interp = [[elem1, elem2] for elem1 in domain for elem2 in domain if elem2 != (elem1 + 1) % model_size]
-    rels = {'E': E_interp}
-    m2 = LabeledModel(domain, rels, signature, is_pos=False, name='m2')
-
-    num_quantifiers = 2
-    quantifier_prefix = [False, True]
-
-    from utils import generate_full_tree
-    full_tree = generate_full_tree(num_quantifiers, domain)
-
-    # strategy trees
-    stree1 = STree(m1, quantifier_prefix, full_tree)
-    stree2 = STree(m2, flip(quantifier_prefix), full_tree)
-    strees = [stree1, stree2]
-    formula = synthesize(signature, strees, options={'mode': 'basic', 'name': 'test1'})
-    print(formula)

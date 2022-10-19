@@ -90,14 +90,6 @@ def parse_qf_formula(signature: Sig, params: List[str], formula_str: str) -> Qua
     return parser.parse_qf_formula(formula_str)
 
 
-def test_parser_1():
-    signature = {'R': 1, 'S': 2}
-    params = ['y0', 'y1', 'y2']
-    formula1_str = '(or false (and (not (R y0 y1)) (or (and (R y2 y0) true) (S y1 y1 y2))))'
-    formula1 = parse_qf_formula(signature, params, formula1_str)
-    print(formula1)
-
-
 # some general utilities
 # full tree of plays
 def generate_full_tree(height, domain):
