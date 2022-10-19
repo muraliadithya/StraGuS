@@ -45,10 +45,6 @@ class Model:
                + f"{{relations: {str(self.rels)} }}" \
                + f"{{signature: {str(self.sig)} }}"
 
-    # useful to pick a default play for the teacher
-    def least(self) -> int:
-        return min(self.domain)
-
     def set_name(self, name: str):
         self.name = name
 
@@ -388,11 +384,9 @@ class STree:
             return ts
 
 
-def update_strategies(failures: Iterable[STree], phi: QuantifierFreeFormula) -> Iterable[STree]:
-    # @PK: is this what you meant?
+def update_strategies(failures: Iterable[STree], phi: QuantifierFreeFormula) -> List[STree]:
     return list(map(lambda st: update_strategy(phi, st), failures))
-    # for stree in failures:
-    #     update_strategy(phi, stree)
+ 
 
 
 # Precondition:

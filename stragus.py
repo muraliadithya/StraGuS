@@ -26,8 +26,14 @@ def verify(strees: Iterable[STree], phi: QuantifierFreeFormula) -> Tuple[List[ST
     return failures, ok
 
 
-def initialize_strategy_trees(ms: Iterable[LabeledModel], pre: Prefix) -> Iterable[STree]:
-    return map(lambda m: STree(m, pre) if m.positive else STree(m, flip(pre)), ms)
+def try_phi(strees: Iterable[STree], phi: QuantifierFreeFormula) -> Tuple[List[STree], List[STree]]:
+    (failures, ok) = verify(strees, phi)
+    failures_updated = update_strategies(failures, phi)
+    return failures_updated, ok 
+
+
+def initialize_strategy_trees(ms: Iterable[LabeledModel], pre: Prefix) -> List[STree]:
+    return list(map(lambda m: STree(m, pre) if m.positive else STree(m, flip(pre)), ms))
 
 
 def stragus(signature: Sig, models: Iterable[LabeledModel], prefix: Prefix, options: dict = None) -> QuantifiedFormula:
@@ -41,11 +47,6 @@ def stragus(signature: Sig, models: Iterable[LabeledModel], prefix: Prefix, opti
         else:
             phi = synthesize(signature, updated + ok, options={**options, 'name': f'synth{str(counter)}'})
             return loop(pre, strees, phi)
-
-    def try_phi(strees: Iterable[STree], phi: QuantifierFreeFormula) -> Tuple[Iterable[STree], Iterable[STree]]:
-        (failures, ok) = verify(strees, phi)
-        failures_updated = update_strategies(failures, phi)
-        return failures_updated, ok 
 
     strategy_trees = initialize_strategy_trees(models, prefix)
     phi = Top()
