@@ -27,7 +27,7 @@ def verify(strees: Iterable[STree], phi: QuantifierFreeFormula) -> Tuple[List[ST
 
 
 def try_phi(strees: Iterable[STree], phi: QuantifierFreeFormula) -> Tuple[List[STree], List[STree]]:
-    # print(f"Trying {phi}")
+    print(f"Trying {phi}")
     (failures, ok) = verify(strees, phi)
     # if failures:
     #     print(failures[0])

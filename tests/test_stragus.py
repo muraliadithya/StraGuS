@@ -87,10 +87,10 @@ def test_stragus_hub_randmodels():
     print(formula)
 
 def test_stragus_random_k_clique(k: int):
-    # ∃x1 ... ∃xk. ∀yz. (\/_{i} y=xi /\ \/_{j} z=xj) /\_{i,j} -> E(y,z)
+    # ∃x1 ... ∃xk. ∀yz. /\_{i < j} xi ≠ xj /\ (\/_{i} y=xi /\ \/_{j} z=xj) /\_{i,j} -> E(y,z)
     signature = {'E': 2, 'equality': 2}
-    model_size = 8
-    num_models = 5
+    model_size = 5
+    num_models = 3
     domain = {a for a in range(model_size)}
     equality = {(x,x) for x in domain}
     ksets = [set(kset) for kset in itertools.combinations(domain, k)]
