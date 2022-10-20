@@ -56,7 +56,7 @@ def test_stragus_hub():
 
 def test_stragus_hub_randmodels():
     signature = {'E': 2}
-    model_size = 5
+    model_size = 30
     num_models = 5
 
     from utils import _random_model
