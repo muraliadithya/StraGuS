@@ -116,7 +116,7 @@ def generate_grammar(signature: Sig, num_quantifiers: int, funcname):
 def synthesize_command(options):
     mode = options.get('mode', 'basic')
     if mode == 'basic':
-        command = str(minisy_path) + ' {}'
+        command = str(minisy_path) + ' --max-depth=1 {}'
     # Enumerative mode not supported for reading formulas from stdout in stream
     # elif mode == 'enum':
     #     command = 'cvc4 --lang=sygus2 --stream {}'
