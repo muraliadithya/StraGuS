@@ -13,8 +13,8 @@ from utils import parse_qf_formula
 
 
 # some essential constants
-with importlib_resources.path('mini-sygus', '__init__.py') as p:
-    minisy_dir = os.path.dirname(p)
+with importlib_resources.path('mini-sygus', '__init__.py') as pathobj:
+    minisy_dir = os.path.dirname(pathobj)
     minisy_path = os.path.join(minisy_dir, 'scripts', 'minisy')
 log_path = '.logs'
 os.makedirs(log_path, exist_ok=True)
@@ -136,10 +136,7 @@ def _stree_to_constraint_aux(tree: Tree, quantifiers: Prefix, funcname: str, mod
             atom_str = f"(not {atom_str})"
         return atom_str
     else:
-        try:
-            assert tree
-        except:
-            pass
+        assert tree
         operator = 'and' if quantifiers[0] else 'or'
         operands = ' '.join(_stree_to_constraint_aux(subtree, quantifiers[1:], funcname, model_name,
                                                      negated_atoms, assignment + [root])
