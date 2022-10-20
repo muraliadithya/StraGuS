@@ -10,13 +10,13 @@ def test_synthesize_1():
     domain = {1, 2}
 
     # first model
-    R_interp = {(1), (2)}  # this relation is true everywhere in this model
+    R_interp = {1, 2}  # this relation is true everywhere in this model
     S_interp = {(1, 2)}
     rels = {'R': R_interp, 'S': S_interp}
     m1 = LabeledModel(domain, rels, signature, is_pos=True, name='m1')
 
     # second model
-    R_interp = {(1)}
+    R_interp = {(1,)}
     S_interp = {(1, 1), (2, 2), (1, 2)}
     rels = {'R': R_interp, 'S': S_interp}
     m2 = LabeledModel(domain, rels, signature, is_pos=False, name='m2')

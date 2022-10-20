@@ -51,7 +51,6 @@ def generate_define_fun(symbol: Tuple[str, int], models: List[LabeledModel]):
         name = model.name
         dom = model.domain
         rel_interp = model.rels[relname]
-        rel_interp = set(tuple(arg) for arg in rel_interp)
         num_interps = len(rel_interp)
         num_total_interps = math.pow(len(dom), arity)
         valuation = None

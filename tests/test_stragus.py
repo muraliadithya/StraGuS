@@ -11,13 +11,13 @@ def test_stragus_1():
     domain = {1, 2}
 
     # first model
-    R_interp = {(1), (2)}  # this relation is true everywhere in this model
+    R_interp = {1, 2}  # this relation is true everywhere in this model
     S_interp = {(1, 2)}
     rels = {'R': R_interp, 'S': S_interp}
     m1 = LabeledModel(domain, rels, signature, is_pos=True, name='m1')
 
     # second model
-    R_interp = {(1)}
+    R_interp = {1}
     S_interp = {(1, 1), (2, 2), (1, 2)}
     rels = {'R': R_interp, 'S': S_interp}
     m2 = LabeledModel(domain, rels, signature, is_pos=False, name='m2')
@@ -69,7 +69,7 @@ def test_stragus_hub_randmodels():
             continue
         not_hub.append(base_model)
     base_models = not_hub
-    print(f'Num models = {str(len(base_models))}\n\n')
+    print(f'Num models = {str(len(base_models))}  Size = {str(model_size)}\n\n')
     neg_models = []
     pos_models = []
     for i in range(len(base_models)):
@@ -85,5 +85,3 @@ def test_stragus_hub_randmodels():
     models = pos_models + neg_models
     formula = stragus(signature, models, quantifier_prefix, options={'mode': 'basic'})
     print(formula)
-
-test_stragus_hub_randmodels()

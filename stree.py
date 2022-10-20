@@ -30,6 +30,10 @@ class Model:
     def __init__(self, domain, rels, sig, name='m0'):
         self.domain = domain
         self.rels = rels
+        # Make unary relations have unary tuples if they don't already
+        for relname, relargs in rels.items():
+            if sig[relname] == 1:
+                rels[relname] = {(arg,) if not isinstance(arg, tuple) else arg for arg in relargs}
         self.sig = sig
         self.name = name
 
@@ -72,7 +76,7 @@ def model_all_vertices_2distinct_neighbours() -> Tuple[LabeledModel, QuantifiedF
     s = {"R": 1, "E": 2, "=": 2}
     d = {1, 2, 3, 4, 5}
     equality = {(x, x) for x in d}
-    r = {"=": equality, "R": {(1),(2),(3),(4)}, "E": {(1, 2), (1, 3), (2, 3), (3, 4), (4, 5), (5, 1)}}
+    r = {"=": equality, "R": {1, 2, 3, 4}, "E": {(1, 2), (1, 3), (2, 3), (3, 4), (4, 5), (5, 1)}}
     mat = Conjunction(
         Negation(Atomic("=", [1, 2], s)),
         Conjunction(Atomic("E", [0, 1], s),
