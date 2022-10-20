@@ -103,9 +103,9 @@ def generate_full_tree(height, domain):
 
 
 def _random_model(size: int, signature: Sig) -> Model:
-    dom = [i for i in range(size)]
+    dom = {i for i in range(size)}
     # build "full" model
-    all_tuples = {name: [list(tup) for tup in itertools.product(dom, repeat=arity)]
+    all_tuples = {name: {tup for tup in itertools.product(dom, repeat=arity)}
                   for name, arity in signature.items()}
     # randomly drop tuples from each relation
     rels = copy.deepcopy(all_tuples)

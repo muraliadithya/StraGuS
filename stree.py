@@ -22,8 +22,8 @@ class Model:
     # name distinguishes models
     name: str
     domain: Set[int]
-    # interpretation of "R" is a set of tuples, set and tuple both modeled as lists
-    rels: Dict[str, List[List[int]]]
+    # interpretation of "R" is a set of tuples
+    rels: Dict[str, Set[Tuple[int]]]
     # dictionary from names to arities
     sig: Sig
 
@@ -50,7 +50,7 @@ class Model:
     # elements of the domain are non-negative, interpretations take values from domain and
     # abide by signature arity
     def well_formed(self) -> bool:
-        def well_formed_interp(name: str, interp: List[List[int]], sg: Sig, dom: Set[int]):
+        def well_formed_interp(name: str, interp: Set[Tuple[int]], sg: Sig, dom: Set[int]):
             return name in sg.keys() \
                    and all(len(tup) == sg[name] for tup in interp) \
                    and all(i in dom for tup in interp for i in tup)
@@ -71,8 +71,8 @@ class LabeledModel(Model):
 def model_all_vertices_2distinct_neighbours() -> Tuple[LabeledModel, QuantifiedFormula]:
     s = {"R": 1, "E": 2, "=": 2}
     d = {1, 2, 3, 4, 5}
-    equality = [[x, x] for x in d]
-    r = {"=": equality, "R": [[1], [2], [3], [4]], "E": [[1, 2], [1, 3], [2, 3], [3, 4], [4, 5], [5, 1]]}
+    equality = {(x, x) for x in d}
+    r = {"=": equality, "R": {(1),(2),(3),(4)}, "E": {(1, 2), (1, 3), (2, 3), (3, 4), (4, 5), (5, 1)}}
     mat = Conjunction(
         Negation(Atomic("=", [1, 2], s)),
         Conjunction(Atomic("E", [0, 1], s),
@@ -84,8 +84,8 @@ def model_all_vertices_2distinct_neighbours() -> Tuple[LabeledModel, QuantifiedF
 def exists_hub() -> Tuple[LabeledModel, QuantifiedFormula]:
     s = {"E": 2, "=": 2}
     d = {1, 2, 3}
-    equality = [[x, x] for x in d]
-    r = {"=": equality, "E": [[1, 2], [1, 3], [2, 3], [2, 1], [3, 1], [3, 2]]}
+    equality = {(x, x) for x in d}
+    r = {"=": equality, "E": {(1, 2), (1, 3), (2, 3), (2, 1), (3, 1), (3, 2)}}
     mat = Atomic("E", [0, 1], s)
     formula = QuantifiedFormula([False, True], mat)
     return LabeledModel(d, r, s, True, "foo"), formula
@@ -95,7 +95,7 @@ def exists_forall_exists() -> Tuple[LabeledModel, QuantifiedFormula]:
     s = {"R": 3}
     d = {1, 2, 3, 4}
     # equality = [[x, x] for x in d]
-    r = {"R": [[1, 2, 2], [1, 1, 1], [1, 3, 3]]}
+    r = {"R": {(1, 2, 2), (1, 1, 1), (1, 3, 3)}}
     mat = Atomic("R", [0, 1, 2], s)
     formula = QuantifiedFormula([False, True, False], mat)
     return LabeledModel(d, r, s, True, "foo"), formula
@@ -214,7 +214,7 @@ class Atomic(QuantifierFreeFormula):
         assert (self.sig == m.sig)
         assert (self.name in self.sig)
         assert (len(self.args) == self.sig[self.name])
-        valuation = [a[arg] for arg in self.args]
+        valuation = tuple([a[arg] for arg in self.args])
         return valuation in m.rels[self.name]
 
 
@@ -329,9 +329,6 @@ class STree:
 
     @staticmethod
     def replace(t: Tree, n: int, r: Tree) -> Tree:
-        # new_tree = []
-        # for (x,c) in t:
-        #     new_tree
         return [(x, r) if x == n else (x, c) for (x, c) in t]
 
     # Create a new subtree to beat current strategy. Example:
