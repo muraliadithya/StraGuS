@@ -3,7 +3,6 @@ import random
 from stree import *
 from utils import *
 from stragus import stragus
-from stree import random_model
 
 
 # hubs
@@ -65,7 +64,8 @@ def test_stragus_hub_randmodels():
     model_size = 5
     num_models = 5
 
-    base_models = [random_model(model_size, signature) for _ in range(num_models)]
+    from utils import _random_model
+    base_models = [_random_model(model_size, signature) for _ in range(num_models)]
     neg_models = []
     pos_models = []
     for i in range(len(base_models)):

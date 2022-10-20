@@ -1,10 +1,13 @@
 from __future__ import annotations
-from typing import List
+from typing import List, Iterable
 
 import pyparsing as pp
+import random
+import itertools
+import copy
 import json
 
-from stree import Sig, QuantifierFreeFormula, LabeledModel
+from stree import Sig, QuantifierFreeFormula, Model, LabeledModel
 from stree import Top, Bot, Atomic, Conjunction, Disjunction, Negation
 
 
@@ -97,6 +100,30 @@ def generate_full_tree(height, domain):
     if height == 0:
         return []
     return [(d, generate_full_tree(height - 1, domain)) for d in domain]
+
+
+def _random_model(size: int, signature: Sig) -> Model:
+    dom = [i for i in range(size)]
+    # build "full" model
+    all_tuples = {name: [list(tup) for tup in itertools.product(dom, repeat=arity)]
+                  for name, arity in signature.items()}
+    # randomly drop tuples from each relation
+    rels = copy.deepcopy(all_tuples)
+    for name, interp in all_tuples.items():
+        for tup in interp:
+            if random.choice([True, False]):
+                rels[name].remove(tup)
+    return Model(dom, rels, signature)
+
+
+# returns random models with distinct names
+def get_models(size: int, num_models: int, signature: Sig) -> Iterable[Model]:
+    models = []
+    for i in range(num_models):
+        model = _random_model(size, signature)
+        model.set_name(f'm{str(i)}')
+        models.append(model)
+    return models
 
 
 # benchmark loader

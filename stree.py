@@ -1,11 +1,9 @@
 from __future__ import annotations
 from abc import abstractmethod
-# from ast import Assign
-# from cProfile import label
-# from re import A
-from typing import Tuple, Mapping, List, Union, Callable, Dict, Set, Iterable, Any
-import random
+from typing import Tuple, List, Dict, Set, Iterable, Any
+
 import itertools
+
 
 Sig = Dict[str, int]
 Prefix = List[bool]
@@ -35,9 +33,10 @@ class Model:
         self.sig = sig
         self.name = name
 
-    # return the list of all assignments for nvars variables
-    def assignments(self, nvars: int) -> List[Assignment]:
-        return generate_all_tuples(nvars, self.domain)
+    # return the list of all assignments for num_vars variables
+    def assignments(self, num_vars: int) -> List[Assignment]:
+        all_tuples = [list(tup) for tup in itertools.product(self.domain, repeat=num_vars)]
+        return all_tuples
 
     def __str__(self) -> str:
         return f"{{name: {self.name} }}" \
@@ -137,7 +136,7 @@ class QuantifiedFormula:
     # pretends the first quantifier of pre is absent, and returns list of domain
     # elements a that make self.matrix true with prefix pre[1:] and assignment
     # partial_assignment+[a]. The intention is that this function is called when
-    # pre starts with an existential.
+    # pre starts with an existential quantifier.
     def extension(self, m: Model, pre: Prefix, partial_assignment: Assignment) -> List[int]:
         return list(filter(lambda a: self.interpret_formula(m, pre[1:], partial_assignment + [a]), m.domain))
 
@@ -252,35 +251,6 @@ l2 = Atomic("E", [0, 0], sig0)
 phi2 = QuantifiedFormula([True], l2)
 
 
-def random_model(size: int, sg: Sig) -> Model:
-    dom = [i for i in range(size)]
-    rs = {}
-    # build "full" model
-    for name, arity in sg.items():
-        rs[name] = generate_all_tuples(arity, dom)
-    # randomly drop tuples from each relation
-    rss = rs.copy()
-    for name, interp in rs.items():
-        for tup in interp:
-            if random.choice([True, False]):
-                rss[name].remove(tup)
-    return Model(dom, rs, sg)
-
-
-def generate_all_tuples(arity: int, d: Iterable) -> List[List[int]]:
-    return list(map(lambda x: list(x), itertools.product(d, repeat=arity)))
-
-
-# returns random models with distinct names
-def get_models(sz: int, nm: int, sg: Sig) -> Iterable[Model]:
-    ms = []
-    for i in range(nm):
-        m = random_model(sz, sg)
-        m.set_name(f'm{str(i)}')
-        ms.append(m)
-    return ms
-
-
 # an STree consists of a model and its tree.
 # The following defines the tree attribute and some utility functions for it
 Tree = List[Tuple[int, Any]]
@@ -387,7 +357,6 @@ class STree:
 def update_strategies(failures: Iterable[STree], phi: QuantifierFreeFormula) -> List[STree]:
     return list(map(lambda st: update_strategy(phi, st), failures))
  
-
 
 # Precondition:
 # ¬(stree.model ⊧ stree.prefix.  phi) if stree.model.positive
