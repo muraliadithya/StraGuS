@@ -61,7 +61,7 @@ def test_stragus_hub():
 
 def test_stragus_hub_randmodels():
     signature = {'E': 2}
-    model_size = 5
+    model_size = 10
     num_models = 5
 
     from utils import _random_model
@@ -81,3 +81,5 @@ def test_stragus_hub_randmodels():
     models = pos_models + neg_models
     formula = stragus(signature, models, quantifier_prefix, options={'mode': 'basic'})
     print(formula)
+
+test_stragus_hub_randmodels()
