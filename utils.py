@@ -132,7 +132,11 @@ def loader_json_string(jsonstr):
     signature = bench_dict['sig']
     prefix = bench_dict['prefix']
     model_specs = bench_dict['models']
-    models = [LabeledModel(set(spec['domain']), spec['rels'], signature, spec['is_pos'], name)
+    models = [LabeledModel(set(spec['domain']),
+                           {relname: set(tuple(arg) for arg in args) for relname, args in spec['rels'].items()},
+                           signature,
+                           spec['is_pos'],
+                           name)
               for name, spec in model_specs.items()]
     groundtruth = parse_qf_formula(signature, *bench_dict['groundtruth'])
     benchmark = {'signature': signature, 'models': models, 'prefix': prefix, 'groundtruth': groundtruth}
