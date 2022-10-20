@@ -61,21 +61,30 @@ def test_stragus_hub():
 
 def test_stragus_hub_randmodels():
     signature = {'E': 2}
-    model_size = 10
-    num_models = 5
+    model_size = 5
+    num_models = 1
 
     from utils import _random_model
     base_models = [_random_model(model_size, signature) for _ in range(num_models)]
+    not_hub = []
+    for base_model in base_models:
+        tuples = base_model.rels['E']
+        domain = base_model.domain
+        if any(all([hub, arb] in tuples for arb in domain) for hub in domain):
+            continue
+        not_hub.append(base_model)
+    base_models = not_hub
+    print(f'Num models = {str(len(base_models))}\n\n')
     neg_models = []
     pos_models = []
     for i in range(len(base_models)):
         base_model = base_models[i]
         domain = base_model.domain
-        rels = base_model.rels
-        neg_models.append(LabeledModel(domain, rels, signature, is_pos=False, name=f"n{str(i)}"))
+        tuples = base_model.rels['E']
+        neg_models.append(LabeledModel(domain, {'E': tuples}, signature, is_pos=False, name=f"n{str(i)}"))
         hub = random.choice(list(base_model.domain))
-        rels['E'].extend([hub, d] for d in domain)
-        pos_models.append(LabeledModel(domain, rels, signature, is_pos=True, name=f"p{str(i)}"))
+        tuples.extend([hub, d] for d in domain)
+        pos_models.append(LabeledModel(domain, {'E': tuples}, signature, is_pos=True, name=f"p{str(i)}"))
 
     quantifier_prefix = [False, True]
     models = pos_models + neg_models
