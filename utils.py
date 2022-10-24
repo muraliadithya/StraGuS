@@ -8,7 +8,7 @@ import copy
 import json
 
 from stree import Sig, QuantifierFreeFormula, Model, LabeledModel
-from stree import Top, Bot, Atomic, Conjunction, Disjunction, Negation
+from stree import Top, Bot, Atomic, Equality, Conjunction, Disjunction, Negation
 
 
 # Simple parser to read an smtlib expression into an stree.QuantifierFreeFormula instance
@@ -26,13 +26,16 @@ class QFFormulaParser:
         AndOp = pp.Literal('and').suppress()
         OrOp = pp.Literal('or').suppress()
         NotOp = pp.Literal('not').suppress()
+        EqOp = pp.Literal('=').suppress()
         TrueConst = pp.Literal('true').suppress()
         FalseConst = pp.Literal('false').suppress()
 
         BasicSymbol = pp.Word(pp.alphanums)
 
         Formula = pp.Forward()
-        AtomicFormula = LParen + BasicSymbol[1, ...] + RParen
+        EqFormula = LParen + EqOp + BasicSymbol + BasicSymbol + RParen
+        RelFormula = LParen + BasicSymbol[1, ...] + RParen
+        AtomicFormula = EqFormula ^ RelFormula
         ConjunctionFormula = LParen + AndOp + Formula[...] + RParen
         DisjunctionFormula = LParen + OrOp + Formula[...] + RParen
         NegationFormula = LParen + NotOp + Formula + RParen
@@ -46,8 +49,14 @@ class QFFormulaParser:
         def _parse_false_const(string, loc, tokens):
             return Bot()
 
-        @AtomicFormula.set_parse_action
-        def _parse_atomic_formula(string, loc, tokens):
+        @EqFormula.set_parse_action
+        def _parse_eq_formula(string, loc, tokens):
+            arg1, arg2 = tokens
+            arg1, arg2 = self.params.index(arg1), self.params.index(arg2)
+            return Equality(arg1, arg2)
+
+        @RelFormula.set_parse_action
+        def _parse_rel_formula(string, loc, tokens):
             rel, args = tokens[0], tokens[1:]
             args_as_indices = [self.params.index(arg) for arg in args]
             return Atomic(rel, args_as_indices, self.signature)

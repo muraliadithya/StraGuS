@@ -107,6 +107,8 @@ def generate_grammar(signature: Sig, num_quantifiers: int, funcname):
         relname, arity = symbol
         args = itertools.product(params, repeat=arity)
         atoms.extend([f"({relname} mid {' '.join(arg)})" for arg in args])
+    # equality atoms
+    atoms.extend(f'(= {var1} {var2})' for var1 in params for var2 in params if var1 != var2)
     indent = '      '
     atomstr = '\n'.join(indent + atom for atom in atoms)
     return params, grammar_template.format(funcname=funcname, paramstr=paramstr, atomstr=atomstr)

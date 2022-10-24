@@ -200,6 +200,22 @@ class Negation(QuantifierFreeFormula):
         return not self.left.interpret(m, a)
 
 
+class Equality(QuantifierFreeFormula):
+    larg: int  # variables represented as integers
+    rarg: int
+
+    def __init__(self, larg: int, rarg: int):
+        super().__init__()
+        self.larg = larg
+        self.rarg = rarg
+
+    def __str__(self) -> str:
+        return f"({self.larg} = {self.rarg})"
+
+    def interpret(self, m: Model, a: Assignment):
+        return a[self.larg] == a[self.rarg]
+
+
 class Atomic(QuantifierFreeFormula):
     name: str
     args: List[int]  # variables represented as integers
