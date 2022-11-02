@@ -5,6 +5,7 @@ from typing import Tuple, List, Dict, Set, Iterable, Any
 import itertools
 
 
+# encodes arity of functions and relations, with constants having arity 0
 Sig = Dict[str, int]
 Prefix = List[bool]
 
@@ -25,15 +26,19 @@ class Model:
     # interpretation of "R" is a set of tuples
     rels: Dict[str, Set[Tuple[int]]]
     # dictionary from names to arities
+    functions: Dict[str, Dict[Tuple[int], int]]
+    constants: Dict[str, int]
     sig: Sig
 
-    def __init__(self, domain, rels, sig, name='m0'):
+    def __init__(self, domain, rels, functions, constants, sig, name='m0'):
         self.domain = domain
-        self.rels = rels
+        self.constants = constants
         # Make unary relations have unary tuples if they don't already
         for relname, relargs in rels.items():
             if sig[relname] == 1:
                 rels[relname] = {(arg,) if not isinstance(arg, tuple) else arg for arg in relargs}
+        self.rels = rels
+        self.functions = functions 
         self.sig = sig
         self.name = name
 
@@ -46,6 +51,8 @@ class Model:
         return f"{{name: {self.name} }}" \
                + f"{{domain: {', '.join(map(str, self.domain))} }}" \
                + f"{{relations: {str(self.rels)} }}" \
+               + f"{{functions: {str(self.functions)} }}" \
+               + f"{{constants: {str(self.constants)} }}" \
                + f"{{signature: {str(self.sig)} }}"
 
     def set_name(self, name: str):
@@ -54,20 +61,33 @@ class Model:
     # elements of the domain are non-negative, interpretations take values from domain and
     # abide by signature arity
     def well_formed(self) -> bool:
-        def well_formed_interp(name: str, interp: Set[Tuple[int]], sg: Sig, dom: Set[int]):
+        def well_formed_rel(name: str, interp: Set[Tuple[int]], sg: Sig, dom: Set[int]):
             return name in sg.keys() \
                    and all(len(tup) == sg[name] for tup in interp) \
                    and all(i in dom for tup in interp for i in tup)
+        def well_formed_function(name: str, interp: Dict[Tuple[int], int], sg: Sig, dom: Set[int]):
+            return name in sg.keys() \
+                   and all(len(args) == sg[name] for args in interp.keys()) \
+                   and all(res in dom and i in dom for args,res in interp.items() for i in args)
+        def well_formed_constant(name: str, interp: int, sg: Sig, dom: Set[int]):
+            return name in sg.keys() \
+                   and sg[name] == 0 \
+                   and interp in dom
 
-        return all(d >= 0 for d in self.domain) and all(well_formed_interp(name, interp, self.sig, self.domain)
-                                                        for name, interp in self.rels.items())
-
+        return all(d >= 0 for d in self.domain) and \
+               all(well_formed_rel(name, interp, self.sig, self.domain) \
+                   for name, interp in self.rels.items()) and \
+               all(well_formed_function(name, interp, self.sig, self.domain) \
+                   for name, interp in self.functions.items()) and \
+               all(well_formed_constant(name, interp, self.sig, self.domain) \
+                   for name, interp in self.constants.items())
+                                                        
 
 class LabeledModel(Model):
     positive: bool
 
-    def __init__(self, domain, rels, signature, is_pos, name):
-        super().__init__(domain, rels, signature, name)
+    def __init__(self, domain, rels, functions, constants, signature, is_pos, name):
+        super().__init__(domain, rels, functions, constants, signature, name)
         self.positive = is_pos
 
 
@@ -82,7 +102,7 @@ def model_all_vertices_2distinct_neighbours() -> Tuple[LabeledModel, QuantifiedF
         Conjunction(Atomic("E", [0, 1], s),
                     Atomic("E", [0, 2], s)))
     formula = QuantifiedFormula([True, False, False], mat)
-    return LabeledModel(d, r, s, True, "foo"), formula
+    return LabeledModel(d, r, {}, {}, s, True, "foo"), formula
 
 
 def exists_hub() -> Tuple[LabeledModel, QuantifiedFormula]:
@@ -92,7 +112,7 @@ def exists_hub() -> Tuple[LabeledModel, QuantifiedFormula]:
     r = {"=": equality, "E": {(1, 2), (1, 3), (2, 3), (2, 1), (3, 1), (3, 2)}}
     mat = Atomic("E", [0, 1], s)
     formula = QuantifiedFormula([False, True], mat)
-    return LabeledModel(d, r, s, True, "foo"), formula
+    return LabeledModel(d, r, {}, {}, s, True, "foo"), formula
 
 
 def exists_forall_exists() -> Tuple[LabeledModel, QuantifiedFormula]:
@@ -102,7 +122,7 @@ def exists_forall_exists() -> Tuple[LabeledModel, QuantifiedFormula]:
     r = {"R": {(1, 2, 2), (1, 1, 1), (1, 3, 3)}}
     mat = Atomic("R", [0, 1, 2], s)
     formula = QuantifiedFormula([False, True, False], mat)
-    return LabeledModel(d, r, s, True, "foo"), formula
+    return LabeledModel(d, r, {}, {}, s, True, "foo"), formula
 
 
 def view_strategy_change(lm: LabeledModel, f: QuantifiedFormula) -> Tuple[STree, STree]:
@@ -201,26 +221,26 @@ class Negation(QuantifierFreeFormula):
 
 
 class Equality(QuantifierFreeFormula):
-    larg: int  # variables represented as integers
-    rarg: int
+    larg: Term
+    rarg: Term
 
-    def __init__(self, larg: int, rarg: int):
+    def __init__(self, larg: Term, rarg: Term):
         super().__init__()
         self.larg = larg
         self.rarg = rarg
 
     def __str__(self) -> str:
-        return f"({self.larg} = {self.rarg})"
+        return f"({str(self.larg)} = {str(self.rarg)})"
 
     def interpret(self, m: Model, a: Assignment):
-        return a[self.larg] == a[self.rarg]
+        return self.larg.interpret(m, a) == self.rarg.interpret(m, a)
 
 
 class Atomic(QuantifierFreeFormula):
     name: str
-    args: List[int]  # variables represented as integers
+    args: List[Term]  
 
-    def __init__(self, name: str, args: List[int], s: Sig):
+    def __init__(self, name: str, args: List[Term], s: Sig):
         super().__init__()
         self.name = name
         self.args = args
@@ -234,7 +254,7 @@ class Atomic(QuantifierFreeFormula):
         assert (self.sig == m.sig)
         assert (self.name in self.sig)
         assert (len(self.args) == self.sig[self.name])
-        valuation = tuple([a[arg] for arg in self.args])
+        valuation = tuple([arg.interpret(m, a) for arg in self.args])
         return valuation in m.rels[self.name]
 
 
@@ -260,14 +280,49 @@ class Bot(QuantifierFreeFormula):
         return False
 
 
+# base class for terms (variables, constants, or functions applied to smaller terms)
+class Term:
+    @abstractmethod
+    def interpret(self, m: Model, a: Assignment) -> int: ...
+
+
+class Variable(Term):
+    def __init__(self, n: int):
+        self.id = n 
+    def __str__(self) -> str:
+        return str(self.id)
+    def interpret(self, m: Model, a: Assignment) -> int:
+        return a[self.id]
+        
+
+class Constant(Term):
+    def __init__(self, name: str):
+        self.name = name 
+    def __str__(self) -> str:
+        return self.name
+    def interpret(self, m: Model, a: Assignment) -> int:
+        m.constants[self.name]
+
+
+class App(Term):
+    def __init__(self, name: str, args: List[Term]):
+        self.name = name 
+        self.args = args
+    def __str__(self) -> str:
+        return self.name + "(" + ', '.join([str(arg) for arg in self.args]) + ")"
+    def interpret(self, m: Model, a: Assignment) -> int:
+        args_interpreted = [arg.interpret(m, a) for arg in self.args]
+        return m.functions[self.name][args_interpreted]
+
+
 sig0 = {"E": 2}
 sig1 = {"E": 2, "R": 1, "P": 3}
 
 # examples of quantified formula
-l1 = Atomic("E", [0, 1], sig0)
+l1 = Atomic("E", [Variable(0), Variable(1)], sig0)
 phi1 = QuantifiedFormula([True, False], l1)
 
-l2 = Atomic("E", [0, 0], sig0)
+l2 = Atomic("E", [Variable(0), Variable(0)], sig0)
 phi2 = QuantifiedFormula([True], l2)
 
 

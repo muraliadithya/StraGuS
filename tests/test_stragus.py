@@ -14,13 +14,13 @@ def test_stragus_1():
     R_interp = {1, 2}  # this relation is true everywhere in this model
     S_interp = {(1, 2)}
     rels = {'R': R_interp, 'S': S_interp}
-    m1 = LabeledModel(domain, rels, signature, is_pos=True, name='m1')
+    m1 = LabeledModel(domain, rels, {}, {}, signature, is_pos=True, name='m1')
 
     # second model
     R_interp = {1}
     S_interp = {(1, 1), (2, 2), (1, 2)}
     rels = {'R': R_interp, 'S': S_interp}
-    m2 = LabeledModel(domain, rels, signature, is_pos=False, name='m2')
+    m2 = LabeledModel(domain, rels, {}, {}, signature, is_pos=False, name='m2')
 
     num_quantifiers = 2
     quantifier_prefix = [True, False]
@@ -39,13 +39,13 @@ def test_stragus_hub():
     hub = list(domain)[0]
     E_interp = {(elem1, elem2) for elem1 in domain for elem2 in domain}
     rels = {'E': E_interp}
-    m1 = LabeledModel(domain, rels, signature, is_pos=True, name='m1')
+    m1 = LabeledModel(domain, rels, {}, {}, signature, is_pos=True, name='m1')
 
     # second model: not a hub
     # every element is not connected to its 'next' element, but is connected to everything else
     E_interp = {(elem1, elem2) for elem1 in domain for elem2 in domain if elem2 != (elem1 + 1) % model_size}
     rels = {'E': E_interp}
-    m2 = LabeledModel(domain, rels, signature, is_pos=False, name='m2')
+    m2 = LabeledModel(domain, rels, {}, {}, signature, is_pos=False, name='m2')
 
     num_quantifiers = 2
     quantifier_prefix = [False, True]
@@ -76,10 +76,10 @@ def test_stragus_hub_randmodels():
         base_model = base_models[i]
         domain = base_model.domain
         tuples = base_model.rels['E']
-        neg_models.append(LabeledModel(domain, {'E': tuples}, signature, is_pos=False, name=f"n{str(i)}"))
+        neg_models.append(LabeledModel(domain, {'E': tuples}, {}, {}, signature, is_pos=False, name=f"n{str(i)}"))
         hub = random.choice(list(base_model.domain))
         tuples = set.union(tuples, {(hub, d) for d in domain})
-        pos_models.append(LabeledModel(domain, {'E': tuples}, signature, is_pos=True, name=f"p{str(i)}"))
+        pos_models.append(LabeledModel(domain, {'E': tuples}, {}, {}, signature, is_pos=True, name=f"p{str(i)}"))
 
     quantifier_prefix = [False, True]
     models = pos_models + neg_models
@@ -112,10 +112,10 @@ def test_stragus_random_k_clique(k: int):
         base_model = base_models[i]
         domain = base_model.domain
         edges = base_model.rels['E']
-        neg_models.append(LabeledModel(domain, {'E': edges, 'equality': equality}, signature, is_pos=False, name=f"n{str(i)}"))
+        neg_models.append(LabeledModel(domain, {'E': edges, 'equality': equality}, {}, {}, signature, is_pos=False, name=f"n{str(i)}"))
         clique = random.choice(ksets)
         augmented_edges = set.union({(x,y) for x in clique for y in clique}, edges)
-        pos_models.append(LabeledModel(domain, {'E': augmented_edges, 'equality': equality}, signature, is_pos=True, name=f"p{str(i)}"))
+        pos_models.append(LabeledModel(domain, {'E': augmented_edges, 'equality': equality}, {}, {}, signature, is_pos=True, name=f"p{str(i)}"))
 
     quantifier_prefix = [False]*k + [True]*2
     models = pos_models + neg_models
