@@ -39,7 +39,7 @@ class QFFormulaParser:
         ConjunctionFormula = LParen + AndOp + Formula[...] + RParen
         DisjunctionFormula = LParen + OrOp + Formula[...] + RParen
         NegationFormula = LParen + NotOp + Formula + RParen
-        Formula <<= TrueConst ^ FalseConst ^ AtomicFormula ^ ConjunctionFormula ^ DisjunctionFormula ^ NegationFormula
+        Formula <<= ConjunctionFormula ^ DisjunctionFormula ^ NegationFormula ^ TrueConst ^ FalseConst ^ AtomicFormula
 
         @TrueConst.set_parse_action
         def _parse_true_const(string, loc, tokens):

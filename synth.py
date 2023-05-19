@@ -6,6 +6,7 @@ import subprocess
 import importlib.resources as importlib_resources
 import math
 import itertools
+import time
 
 from stree import Sig, LabeledModel, Prefix, STree, Tree
 
@@ -87,12 +88,17 @@ def generate_grammar(signature: Sig, num_quantifiers: int, funcname):
     grammar_template = """
 ;; Grammar
 (synth-fun {funcname} ((mid ModelId) {paramstr}) Bool
-    ((Start Bool))
+    ((Start Bool) (Conj Bool) (Atoms Bool))
 
     (( Start Bool (
-        (and Start Start)
-        (or Start Start)
-        (not Start)
+        (or Conj Conj)
+        ))
+    (Conj Bool (
+        (and Atoms Conj)
+        (not Conj)
+        Atoms
+    ))
+    (Atoms Bool (
 {atomstr}
         true
         false
@@ -195,9 +201,13 @@ def synthesize(signature: Sig, strategy_trees: Iterable[STree], options: dict = 
 
     command = synthesize_command(options)
     proc = subprocess.Popen(command.format(synth_file), stdout=subprocess.PIPE, shell=True)
+    start_time = time.time()
     out, err = proc.communicate()
+    end_time = time.time()
+    print(f'Time taken to synthesize: {str(end_time - start_time)} seconds')
     if err:
         raise RuntimeError(f'Synthesizer returned error:\n {err}\n')
     out = out.decode('utf-8')  # convert from bytestr
     formula_str = out.split('Bool')[1].strip()[:-1].replace(' mid ', ' ')
+    print(f'Raw output: {formula_str}')
     return parse_qf_formula(signature, formal_params, formula_str)

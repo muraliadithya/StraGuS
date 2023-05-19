@@ -86,13 +86,13 @@ def test_stragus_hub_randmodels():
     formula = stragus(signature, models, quantifier_prefix, options={'mode': 'basic'})
     print(formula)
 
-def test_stragus_random_k_clique(k: int):
+
+def test_stragus_random_k_clique(k=3):#random.choice(range(3, 5))):
     # ∃x1 ... ∃xk. ∀yz. /\_{i < j} xi ≠ xj /\ (\/_{i} y=xi /\ \/_{j} z=xj) /\_{i,j} -> E(y,z)
-    signature = {'E': 2, 'equality': 2}
+    signature = {'E': 2}
     model_size = 5
-    num_models = 3
+    num_models = 5
     domain = {a for a in range(model_size)}
-    equality = {(x,x) for x in domain}
     ksets = [set(kset) for kset in itertools.combinations(domain, k)]
 
     from utils import _random_model
@@ -101,11 +101,17 @@ def test_stragus_random_k_clique(k: int):
     not_k_clique = []
     for base_model in base_models:
         tuples = base_model.rels['E']
-        if all((x,y) in tuples for kset in ksets for x in kset for y in kset):
+        tuples = tuples | {(y, x) for (x, y) in tuples}
+        tuples = tuples | set((x, x) for x in domain)
+        base_model.rels['E'] = tuples
+        if any(all((x, y) in tuples for x in kset for y in kset) for kset in ksets):
             continue
         not_k_clique.append(base_model)
     base_models = not_k_clique
-    print(f'Num models = {str(len(base_models))}  Size = {str(model_size)}\n\n')
+    num_models = len(base_models)
+    # if num_models == 0:
+    #     test_stragus_random_k_clique(k)
+    print(f'Clique size = {str(k)} Num models = {str(len(base_models))}  Size = {str(model_size)}\n\n')
     neg_models = []
     pos_models = []
     for i in range(len(base_models)):
@@ -116,9 +122,9 @@ def test_stragus_random_k_clique(k: int):
         clique = random.choice(ksets)
         augmented_edges = set.union({(x,y) for x in clique for y in clique}, edges)
         pos_models.append(LabeledModel(domain, {'E': augmented_edges, 'equality': equality}, {}, {}, signature, is_pos=True, name=f"p{str(i)}"))
-
-    quantifier_prefix = [False]*k + [True]*2
+    quantifier_prefix = [False]*k #[False]*k + [True]*2
     models = pos_models + neg_models
     formula = stragus(signature, models, quantifier_prefix, options={'mode': 'basic'})
     print(formula)
-    
+
+test_stragus_random_k_clique()
