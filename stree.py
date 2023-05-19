@@ -237,6 +237,22 @@ class Equality(QuantifierFreeFormula):
 
 
 class Atomic(QuantifierFreeFormula):
+    larg: int  # variables represented as integers
+    rarg: int
+
+    def __init__(self, larg: int, rarg: int, s: Sig):
+        super().__init__()
+        self.larg = larg
+        self.rarg = rarg
+
+    def __str__(self) -> str:
+        return f"({self.larg} = {self.rarg})"
+
+    def interpret(self, m: Model, a: Assignment):
+        return a[self.larg] == a[self.rarg]
+
+
+class Equality(QuantifierFreeFormula):
     name: str
     args: List[Term]  
 
